@@ -5,3 +5,6 @@
 .project
 .pydevproject
 .settings
+
+# Keepnote
+temp_test_*

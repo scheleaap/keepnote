@@ -1,0 +1,13 @@
+# TODO
+# - Rename "payload" to "attachment"
+# More tests:
+# - Typed attributes: dict, list/tuple, basestring, bool, int/long, float, None, Data, datetime.datetime, [other]
+# FS specific tests:
+# - Invalid path characters in node ids (?*/\)
+# - Invalid path characters in payload names (?*/\)
+# - XML containing a node id that does not correspond to the directory name: def test_fs_node_xml(self):
+# - Verify that the written XML is what I expect it to be
+# - Clean up unreferenced payload files
+# - Use directory names based on the node's title, if present
+# - Use the XML to verify whether a payload exists, not the file system
+# - Tamper detection
