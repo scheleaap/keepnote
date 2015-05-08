@@ -1,0 +1,28 @@
+	# TODO:
+	# NotebookNode:
+	# - new child node: parent has child, child has parent, child is dirty, save, child is not dirty
+	# - new child with duplicate id
+	# - editing a node
+	
+	
+	# Notebook:
+	# - dirty if >= 1 nodes are dirty or if notebook is dirty
+	# - only save nodes that have been changed
+	# - only save notebook if it has been changed
+	# - Notebook.ui_prefs
+	#   - set attributes -> save -> get attributes
+	# - Notebook.default_font
+	# - Notebook.icons
+	# - Notebook.node_changed = Listeners()  # signature = (node, recurse)
+	# - no trash: test_trash_created
+	# - title
+	# - ordering ?
+	# - Notebook.get_trash()
+	# - Notebook.empty_trash()
+	# - Notebook.move_allowed() ?
+	# - Notebook.delete_allowed() ?
+	# - multiple trash nodes
+	# - trash parent != root
+	# - repairing incorrect structures
+	# NotebookError
+	# NotebookVersionError
