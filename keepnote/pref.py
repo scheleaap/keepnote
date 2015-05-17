@@ -122,3 +122,14 @@ class Pref (object):
         """Clear the config value"""
         kargs = {"define": True}
         get_pref(self._data, *args, **kargs).clear()
+
+    def __eq__(self, other):
+        return \
+            isinstance(other, Pref) and \
+            self._data == other._data
+
+    def __ne__(self, other):
+        return not self.__eq__(other);
+
+    def __repr__(self):
+        return '{cls}[{_data}]'.format(cls=self.__class__.__name__, **self.__dict__)
