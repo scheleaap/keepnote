@@ -1,28 +1,36 @@
-	# TODO:
-	# NotebookNode:
-	# - new child node: parent has child, child has parent, child is dirty, save, child is not dirty
-	# - new child with duplicate id
-	# - editing a node
-	
-	
-	# Notebook:
-	# - dirty if >= 1 nodes are dirty or if notebook is dirty
-	# - only save nodes that have been changed
-	# - only save notebook if it has been changed
-	# - Notebook.ui_prefs
-	#   - set attributes -> save -> get attributes
-	# - Notebook.default_font
-	# - Notebook.icons
-	# - Notebook.node_changed = Listeners()  # signature = (node, recurse)
-	# - no trash: test_trash_created
-	# - title
-	# - ordering ?
-	# - Notebook.get_trash()
-	# - Notebook.empty_trash()
-	# - Notebook.move_allowed() ?
-	# - Notebook.delete_allowed() ?
-	# - multiple trash nodes
-	# - trash parent != root
-	# - repairing incorrect structures
-	# NotebookError
-	# NotebookVersionError
+# NotebookNode
+
+- new child with duplicate id
+- loading:
+    created_time
+    modified_time
+    order
+    duplicate_of
+    icon
+    icon_open
+    title_fgcolor
+    title_bgcolor
+    client_preferences
+
+# - Remove the content type for trash nodes completely?
+# - trashed_from/deleted_from
+# - ContentNode.trash()
+# - FolderNode.trash()
+# - TrashNode.empty()
+# - dirty if >= 1 nodes are dirty or if notebook is dirty
+# - only save nodes that have been changed
+# - only save notebook if it has been changed
+# - Notebook.ui_prefs
+#   - set attributes -> save -> get attributes
+# - Notebook.default_font
+# - Notebook.icons
+# - Notebook.node_changed = Listeners()  # signature = (node, recurse)
+# - ordering ?
+# - multiple trash nodes
+# - trash parent != root
+# - repairing incorrect structures
+# NotebookError
+# NotebookVersionError
+
+Bugs in KeepNote, die gefixt zijn/worden:
+- Opslaan is niet consistent: node-inhoud wordt direct opgeslagen, metadata niet

@@ -6,15 +6,15 @@ import StringIO as stringio
 import unittest
 
 from keepnote.notebooknew.storage import *
-from test.utils import assertFileObjectEquals
+from test.utils import assert_file_object_equals
 
 DEFAULT_ID = 'my_id_%s'
 DEFAULT_TITLE = 'my_title'
 DEFAULT_ATTRIBUTES = { 'title': DEFAULT_TITLE, 'key2': 'value2' }
 CONTENT_TYPE_HTML = 'text/html'
-DEFAULT_HTML_PAYLOAD_PATH = '../../../testdata/index.html'
+DEFAULT_HTML_PAYLOAD_PATH = '../../../tests/data/content/index.html'
 DEFAULT_HTML_PAYLOAD_NAME = os.path.basename(DEFAULT_HTML_PAYLOAD_PATH)
-DEFAULT_PNG_PAYLOAD_PATH = '../../../testdata/image.png'
+DEFAULT_PNG_PAYLOAD_PATH = '../../../tests/data/content/image.png'
 DEFAULT_PNG_PAYLOAD_NAME = os.path.basename(DEFAULT_PNG_PAYLOAD_PATH)
 
 class StoredNotebookTest(unittest.TestCase):
@@ -158,7 +158,7 @@ class NotebookStorageTestBase(object):
         self.assertEqual(create_stored_node(i=1, payload_names=[DEFAULT_HTML_PAYLOAD_NAME]), s.get_node(id_))
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME) as f2:
-                assertFileObjectEquals(self, f1, f2)
+                assert_file_object_equals(self, f1, f2)
     
     def test_add_node_payload_twice(self):
         s = self.create_notebook_storage()
@@ -214,10 +214,10 @@ class NotebookStorageTestBase(object):
         self.assertEqual(create_stored_node(payload_names=[DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_NAME]), s.get_node(id_))
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME) as f2:
-                assertFileObjectEquals(self, f1, f2)
+                assert_file_object_equals(self, f1, f2)
         with io.open(DEFAULT_PNG_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, DEFAULT_PNG_PAYLOAD_NAME) as f2:
-                assertFileObjectEquals(self, f1, f2)
+                assert_file_object_equals(self, f1, f2)
         
     def test_remove_node_payload(self):
         s = self.create_notebook_storage()

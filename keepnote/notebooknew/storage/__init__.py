@@ -72,7 +72,7 @@ class NotebookStorage:
 		@param node_id: The id of the new node. Must be unique.
 		@param content_type: The content type of the node.
 		@param attributes: The attributes of the node.
-		@param payloads: A list containing tuples consisting of paylad names and file-like objects containing the payload data.
+		@param payloads: A list containing tuples consisting of paylad names and file-like objects containing payload data.
 		@raise NodeAlreadyExists: If a node with the same id already exists.
 		@raise IOError: If the node cannot be written.
 		"""
