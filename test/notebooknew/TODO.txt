@@ -34,3 +34,75 @@
 
 Bugs in KeepNote, die gefixt zijn/worden:
 - Opslaan is niet consistent: node-inhoud wordt direct opgeslagen, metadata niet
+
+
+New Test Structure:
+
+NotebookTest
+	test_is_dirty
+	test_is_dirty_if_nodes_dirty
+	test_load_content_node_main_payload_name_missing
+	test_load_trash_node
+
+ContentFolderNodeTestBase
+x	test_is_root
+x	test_is_in_trash
+x	test_delete_without_children
+x	test_delete_with_children
+x
+x	test_delete_if_root
+x	test_new_content_child_node
+-	test_new_content_child_node_no_main_payload
+x	test_new_content_child_node_in_trash
+x	test_new_content_child_node_if_deleted_unsaved
+x	test_new_folder_child_node
+x	test_new_folder_child_node_in_trash
+x	test_new_folder_child_node_if_deleted_unsaved
+	test_copy
+	test_copy_after_sibling
+	test_copy_to_trash
+	test_copy_to_node_in_trash
+	test_copy_to_notebook
+	test_copy_subtree
+	test_copy_subtree_to_child
+	test_move
+	test_move_after_sibling
+	test_move_to_trash
+	test_move_to_notebook_and_save
+
+	test_save_creation
+	test_save_modification
+	test_save_deletion
+	test_save_with_dirty_parent
+	test_save_with_dirty_children
+
+	test node already exists with id for content/folder
+
+ContentNodeTest
+	test: "Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed."
+x	test_add_additional_payload
+x	test_add_additional_payload_existing1
+x	test_add_additional_payload_existing2
+x	test_get_payload_from_storage
+x	test_remove_additional_payload
+x	test_remove_additional_payload_existing_in_storage
+x	test_set_main_payload
+x	test_set_main_payload_existing_in_storage
+
+	test saving of add/remove/set payload
+
+FolderTest
+	test_incorrect_content_type
+
+TrashTest
+	test_incorrect_content_type
+	test_is_root
+	test_is_in_trash
+	test_delete
+	test_new_content_child_node_in_trash
+	test_new_folder_child_node_in_trash
+	test_copy
+	test_copy_after_sibling
+	test_copy_subtree
+	test_copy_subtree_to_child
+	test_move
