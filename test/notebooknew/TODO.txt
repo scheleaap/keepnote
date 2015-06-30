@@ -58,7 +58,6 @@ x	test_new_content_child_node_if_deleted_unsaved
 x	test_new_folder_child_node
 x	test_new_folder_child_node_in_trash
 x	test_new_folder_child_node_if_deleted_unsaved
-	test_copy
 	test_copy_after_sibling
 	test_copy_to_trash
 	test_copy_to_node_in_trash
@@ -88,11 +87,15 @@ x	test_remove_additional_payload
 x	test_remove_additional_payload_existing_in_storage
 x	test_set_main_payload
 x	test_set_main_payload_existing_in_storage
+x	test_copy
+x	test_copy_payload_in_storage
 
 	test saving of add/remove/set payload
 
 FolderTest
 	test_incorrect_content_type
+	test_copy
+	test_copy_payload_in_storage
 
 TrashTest
 	test_incorrect_content_type

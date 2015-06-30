@@ -452,11 +452,14 @@ class ContentFolderNodeTestBase(object):
 		node = self._create_node(parent=parent, is_dirty=False)
 		self.assertEquals(False, node.is_root)
 	
-	# TODO: Zo ombouwen, dat alleen gekeken wordt of parent.is_in_trash true is. Dan hoef je er alleen voor te zorgen dat TrashNode.is_in_trash altijd True is en hoef je niet naar content_type te kijken.
+	def test_is_trash(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		self.assertEquals(False, node.is_trash)
+		
 	def test_is_in_trash_1(self):
 		parent = Mock(spec=NotebookNode)
-		parent.content_type = CONTENT_TYPE_HTML
-		parent.parent = None
+		parent.is_trash = False
+		parent.is_in_trash = False
 		
 		node = self._create_node(parent=parent, is_dirty=False)
 		
@@ -464,20 +467,18 @@ class ContentFolderNodeTestBase(object):
 	
 	def test_is_in_trash_2(self):
 		parent = Mock(spec=NotebookNode)
-		parent.content_type = CONTENT_TYPE_TRASH
+		parent.is_trash = True
+		parent.is_in_trash = False
 		
 		node = self._create_node(parent=parent, is_dirty=False)
 		self.assertEquals(True, node.is_in_trash)
 	
 	def test_is_in_trash_3(self):
-		parent1 = Mock(spec=NotebookNode)
-		parent1.content_type = CONTENT_TYPE_TRASH
-		parent1.parent = None
-		parent2 = Mock(spec=NotebookNode)
-		parent2.content_type = CONTENT_TYPE_HTML
-		parent2.parent = parent1
+		parent = Mock(spec=NotebookNode)
+		parent.is_trash = False
+		parent.is_in_trash = True
 		
-		node = self._create_node(parent=parent2, is_dirty=False)
+		node = self._create_node(parent=parent, is_dirty=False)
 		
 		self.assertEquals(True, node.is_in_trash)
 	
@@ -575,10 +576,27 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals(DEFAULT_PNG_PAYLOAD, child.get_payload(DEFAULT_PNG_PAYLOAD_NAME))
 		self.assertEquals(True, child.is_dirty)
 	
-	# TODO: Ipv naar content_type kijken, kijken of parent.is_in_trash True is.
-	def test_new_content_child_node_in_trash(self):
+	def test_new_content_child_node_in_trash_1(self):
 		parent = Mock(spec=NotebookNode)
-		parent.content_type = CONTENT_TYPE_TRASH
+		parent.is_trash = True
+		parent.is_in_trash = False
+		node = self._create_node(parent=parent, is_dirty=False)
+		
+		self.assertEquals(False, node.can_add_new_content_child_node())
+		
+		with self.assertRaises(IllegalOperationError):
+			node.new_content_child_node(
+					node_id=DEFAULT_ID,
+					content_type=CONTENT_TYPE_HTML,
+					title=DEFAULT_TITLE,
+					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+	 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+	 				)
+	
+	def test_new_content_child_node_in_trash_2(self):
+		parent = Mock(spec=NotebookNode)
+		parent.is_trash = False
+		parent.is_in_trash = True
 		node = self._create_node(parent=parent, is_dirty=False)
 		
 		self.assertEquals(False, node.can_add_new_content_child_node())
@@ -611,6 +629,25 @@ class ContentFolderNodeTestBase(object):
 	 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 	 				)
 	
+	def test_new_content_child_node_after_sibling(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		
+		child1 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child2 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		
+		# Add content node.
+		child3 = node.new_content_child_node(
+				node_id=DEFAULT_ID,
+				content_type=CONTENT_TYPE_HTML,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+ 				additional_payloads=[],
+ 				after=child1,
+				)
+		
+		# Verify the parent.
+		self.assertEquals([child1, child3, child2], node.children)
+		
 	def test_new_folder_child_node(self):
 		node = self._create_node(parent=None, is_dirty=False)
 		
@@ -619,7 +656,6 @@ class ContentFolderNodeTestBase(object):
 		# Add folder node.
 		child = node.new_folder_child_node(
 				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
 				title=DEFAULT_TITLE,
 				)
 		
@@ -628,15 +664,15 @@ class ContentFolderNodeTestBase(object):
 		
 		# Verify the child.
 		self.assertEquals(DEFAULT_ID, child.node_id)
-		self.assertEquals(CONTENT_TYPE_HTML, child.content_type)
+		self.assertEquals(CONTENT_TYPE_FOLDER, child.content_type)
 		self.assertEquals(node, child.parent)
 		self.assertEquals(DEFAULT_TITLE, child.title)
 		self.assertEquals(True, child.is_dirty)
 	
-	# TODO: Ipv naar content_type kijken, kijken of parent.is_in_trash True is.
-	def test_new_folder_child_node_in_trash(self):
+	def test_new_folder_child_node_in_trash_1(self):
 		parent = Mock(spec=NotebookNode)
-		parent.content_type = CONTENT_TYPE_TRASH
+		parent.is_trash = True
+		parent.is_in_trash = False
 		node = self._create_node(parent=parent, is_dirty=False)
 		
 		self.assertEquals(False, node.can_add_new_folder_child_node())
@@ -644,7 +680,20 @@ class ContentFolderNodeTestBase(object):
 		with self.assertRaises(IllegalOperationError):
 			node.new_folder_child_node(
 					node_id=DEFAULT_ID,
-					content_type=CONTENT_TYPE_HTML,
+					title=DEFAULT_TITLE,
+	 				)
+	
+	def test_new_folder_child_node_in_trash_2(self):
+		parent = Mock(spec=NotebookNode)
+		parent.is_trash = False
+		parent.is_in_trash = True
+		node = self._create_node(parent=parent, is_dirty=False)
+		
+		self.assertEquals(False, node.can_add_new_folder_child_node())
+		
+		with self.assertRaises(IllegalOperationError):
+			node.new_folder_child_node(
+					node_id=DEFAULT_ID,
 					title=DEFAULT_TITLE,
 	 				)
 	
@@ -661,10 +710,9 @@ class ContentFolderNodeTestBase(object):
 		with self.assertRaises(IllegalOperationError):
 			node.new_folder_child_node(
 					node_id=DEFAULT_ID,
-					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 	 				)
-		
+	
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
 			self,
@@ -851,7 +899,87 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node.set_main_payload('new payload')
 		
 		self.assertEquals('new payload', node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))		
+	
+	def test_copy(self):
+		"""Tests copying a single node without its children."""
 		
+		# Create the original and target nodes. The source has a child node.
+		original = ContentNode(
+				notebook_storage=None,
+				node_id=new_node_id(),
+				content_type=DEFAULT_CONTENT_TYPE,
+				parent=None,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				is_dirty=True
+				)
+		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		target = Mock(spec=NotebookNode)
+		
+		# Verify the original.
+		self.assertEquals(True, original.can_copy(target, with_subtree=False))
+		
+		# Copy the node.
+		original.copy(target, with_subtree=False)
+		
+		# Verify the notebook, the parent and the copy.
+		target.new_content_child_node.assert_called_once_with(
+				node_id=mock.ANY,
+				content_type=DEFAULT_CONTENT_TYPE,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				)
+	
+	def test_copy_payload_in_storage(self):
+		"""Tests copying a single node without its children."""
+		
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the original and target nodes. The source has a child node.
+		original = ContentNode(
+				notebook_storage=notebook_storage,
+				node_id=new_node_id(),
+				content_type=DEFAULT_CONTENT_TYPE,
+				parent=None,
+				title=DEFAULT_TITLE,
+				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
+				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
+				is_dirty=True
+				)
+		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		target = Mock(spec=NotebookNode)
+		
+		def side_effect_get_node_payload(node_id, payload_name):
+			if node_id == original.node_id and payload_name == DEFAULT_HTML_PAYLOAD_NAME:
+				return io.BytesIO(DEFAULT_HTML_PAYLOAD)
+			elif node_id == original.node_id and payload_name == DEFAULT_PNG_PAYLOAD_NAME:
+				return io.BytesIO(DEFAULT_PNG_PAYLOAD)
+			else:
+				raise storage.PayloadDoesNotExistError
+		notebook_storage.get_node_payload.side_effect = side_effect_get_node_payload
+		
+		# Verify the original.
+		self.assertEquals(True, original.can_copy(target, with_subtree=False))
+		
+		# Copy the node.
+		original.copy(target, with_subtree=False)
+		
+		# Verify the notebook, the parent and the copy.
+		target.new_content_child_node.assert_called_once_with(
+				node_id=mock.ANY,
+				content_type=DEFAULT_CONTENT_TYPE,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				)
+
+	
+	# Further tests:
+	# - copy with payload in storage
+
+
 
 # Utilities
 

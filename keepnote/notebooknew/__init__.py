@@ -64,7 +64,6 @@ class Notebook(object):
 				notebook_node = FolderNode(
 						notebook_storage=self._notebook_storage,
 						node_id=stored_node.node_id,
-						content_type=stored_node.content_type,
 						parent=None,
 						title=title,
 						is_dirty=False,
@@ -73,7 +72,6 @@ class Notebook(object):
 				notebook_node = TrashNode(
 						notebook_storage=self._notebook_storage,
 						node_id=stored_node.node_id,
-						content_type=stored_node.content_type,
 						parent=None,
 						title=title,
 						is_dirty=False,
@@ -132,7 +130,6 @@ class Notebook(object):
 			notebook_node = TrashNode(
 					notebook_storage=self._notebook_storage,
 					node_id=node_id,
-					content_type=CONTENT_TYPE_TRASH,
 					parent=self.root,
 					title='', # TODO
 					is_dirty=False,
@@ -194,6 +191,14 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
+	def can_copy(self, target, with_subtree):
+		"""TODO"""
+		raise NotImplementedError('TODO')
+	
+	def copy(self, target, with_subtree):
+		"""TODO"""
+		raise NotImplementedError('TODO')
+	
 	def delete(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
@@ -208,9 +213,32 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads=None):
+	@property
+	def is_trash(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
+	
+	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, after=None):
+		"""Adds a new child node.
+		
+		@param node_id: The id of the new node. Must be unique within the notebook.
+		@param content_type: The content type of the node.
+		@param title: The title of the node.
+		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
+		@param additional_payloads: A list containing tuples consisting of paylad names and payload data.
+		@param after: TODO
+#		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
+		"""
+		raise NotImplementedError('TODO')
+	
+	def new_folder_child_node(self, node_id, title, after=None):
+		"""Adds a new child node.
+		
+		@param node_id: The id of the new node. Must be unique within the notebook.
+		@param title: The title of the node.
+		@param after: TODO
+#		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
+		"""
 
 
 class ContentNode(NotebookNode):
@@ -274,6 +302,19 @@ class ContentNode(NotebookNode):
 		"""TODO"""
 		return not self.is_in_trash and not self.is_deleted_unsaved
 	
+	def can_copy(self, target, with_subtree):
+		return True
+	
+	def copy(self, target, with_subtree):
+		"""TODO"""
+		target.new_content_child_node(
+				node_id=new_node_id(),
+				content_type=self.content_type,
+				title=self.title,
+				main_payload=(self.main_payload_name, self.get_payload(self.main_payload_name)),
+				additional_payloads=[(additional_payload_name, self.get_payload(additional_payload_name)) for additional_payload_name in self.additional_payload_names]
+				)
+	
 	def delete(self):
 		"""TODO"""
 		if self.parent is None:
@@ -295,28 +336,19 @@ class ContentNode(NotebookNode):
 		
 	@property
 	def is_in_trash(self):
-		parent = self.parent
-		while parent is not None:
-			if parent.content_type == CONTENT_TYPE_TRASH:
-				return True
-			else:
-				parent = parent.parent
+		if self.parent is not None:
+			return self.parent.is_trash or self.parent.is_in_trash
 		return False
 	
 	@property
 	def is_root(self):
 		return self.parent is None
-	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads=None):
-		"""Adds a new child node.
 		
-		@param node_id: The id of the new node. Must be unique within the notebook.
-		@param content_type: The content type of the node.
-		@param title: The title of the node.
-		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
-		@param additional_payloads: A list containing tuples consisting of paylad names and payload data.
-#		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
-		"""
+	@property
+	def is_trash(self):
+		return False
+	
+	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, after=None):
 #		if additional_payloads is None:
 #			additional_payloads = []
 		
@@ -339,14 +371,7 @@ class ContentNode(NotebookNode):
 		
 		return child
 	
-	def new_folder_child_node(self, node_id, content_type, title):
-		"""Adds a new child node.
-		
-		@param node_id: The id of the new node. Must be unique within the notebook.
-		@param content_type: The content type of the node.
-		@param title: The title of the node.
-#		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
-		"""
+	def new_folder_child_node(self, node_id, title, after=None):
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
 		elif self.is_deleted_unsaved:
@@ -355,7 +380,6 @@ class ContentNode(NotebookNode):
 		child = FolderNode(
 				notebook_storage=self._notebook_storage,
 				node_id=node_id,
-				content_type=content_type,
 				parent=self,
 				title=title,
 				is_dirty=True)
@@ -378,12 +402,11 @@ class FolderNode(NotebookNode):
 	"""A folder node in a notebook. A folder node has no content.
 	"""
 
-	def __init__(self, notebook_storage, node_id, content_type, parent, title, is_dirty):
+	def __init__(self, notebook_storage, node_id, parent, title, is_dirty):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use. 
 		@param node_id: The id of the new node.
-		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param is_dirty: Indicates whether the node has changed since it was last saved.
@@ -391,7 +414,7 @@ class FolderNode(NotebookNode):
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
 				node_id=node_id,
-				content_type=content_type,
+				content_type=CONTENT_TYPE_FOLDER,
 				parent=parent,
 				title=title,
 				is_dirty=is_dirty,
@@ -401,12 +424,11 @@ class TrashNode(FolderNode):
 	"""A trash node in a notebook. A trash node has no content.
 	"""
 
-	def __init__(self, notebook_storage, node_id, content_type, parent, title, is_dirty):
+	def __init__(self, notebook_storage, node_id, parent, title, is_dirty):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use. 
 		@param node_id: The id of the new node.
-		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param is_dirty: Indicates whether the node has changed since it was last saved.
@@ -414,7 +436,7 @@ class TrashNode(FolderNode):
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
 				node_id=node_id,
-				content_type=content_type,
+				content_type=CONTENT_TYPE_TRASH,
 				parent=parent,
 				title=title,
 				is_dirty=is_dirty,
