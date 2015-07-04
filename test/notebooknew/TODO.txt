@@ -64,11 +64,12 @@ x	test_copy_to_node_in_trash
 -	test_copy_to_notebook
 x	test_copy_with_subtree
 x	test_copy_with_subtree_to_child
-	test: ID of copied node different
-	test_move
-	test_move_after_sibling
-	test_move_to_trash
-	test_move_to_notebook_and_save
+x	test_move
+x	test_move_after_sibling
+-	test_move_to_trash
+x	test_move_root
+x	test_move_to_child
+x	test_move_to_different_notebook
 
 	test_save_creation
 	test_save_modification
