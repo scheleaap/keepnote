@@ -195,11 +195,15 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
-	def copy(self, target, with_subtree):
+	def copy(self, target, with_subtree, behind=None):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
 	def delete(self):
+		"""TODO"""
+		raise NotImplementedError('TODO')
+	
+	def is_node_a_child(self, node):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
@@ -218,7 +222,7 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, after=None):
+	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, behind=None):
 		"""Adds a new child node.
 		
 		@param node_id: The id of the new node. Must be unique within the notebook.
@@ -226,17 +230,17 @@ class NotebookNode(object):
 		@param title: The title of the node.
 		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
 		@param additional_payloads: A list containing tuples consisting of paylad names and payload data.
-		@param after: TODO
+		@param behind: TODO
 #		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
 		"""
 		raise NotImplementedError('TODO')
 	
-	def new_folder_child_node(self, node_id, title, after=None):
+	def new_folder_child_node(self, node_id, title, behind=None):
 		"""Adds a new child node.
 		
 		@param node_id: The id of the new node. Must be unique within the notebook.
 		@param title: The title of the node.
-		@param after: TODO
+		@param behind: TODO
 #		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
 		"""
 
@@ -288,7 +292,7 @@ class ContentNode(NotebookNode):
 		"""TODO"""
 		if payload_name == self.main_payload_name:
 			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload_name))
-		if payload_name in self.additional_payload_names:
+		elif payload_name in self.additional_payload_names:
 			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload_name))
 		
 		self.additional_payload_names.append(payload_name)
@@ -303,17 +307,31 @@ class ContentNode(NotebookNode):
 		return not self.is_in_trash and not self.is_deleted_unsaved
 	
 	def can_copy(self, target, with_subtree):
-		return True
+		if target.is_trash or target.is_in_trash:
+			return False
+		elif with_subtree and self.is_node_a_child(target):
+			return False
+		else:
+			return True
 	
-	def copy(self, target, with_subtree):
+	def copy(self, target, with_subtree, behind=None):
 		"""TODO"""
-		target.new_content_child_node(
+		if target.is_trash or target.is_in_trash:
+			raise IllegalOperationError('Cannot copy a node to the trash')
+		elif with_subtree and self.is_node_a_child(target):
+			raise IllegalOperationError('Cannot copy a node with its children to a child')
+		
+		copy = target.new_content_child_node(
 				node_id=new_node_id(),
 				content_type=self.content_type,
 				title=self.title,
 				main_payload=(self.main_payload_name, self.get_payload(self.main_payload_name)),
-				additional_payloads=[(additional_payload_name, self.get_payload(additional_payload_name)) for additional_payload_name in self.additional_payload_names]
+				additional_payloads=[(additional_payload_name, self.get_payload(additional_payload_name)) for additional_payload_name in self.additional_payload_names],
+				behind=behind
 				)
+		if with_subtree:
+			for child in self.children:
+				child.copy(copy, with_subtree=with_subtree)
 	
 	def delete(self):
 		"""TODO"""
@@ -333,7 +351,16 @@ class ContentNode(NotebookNode):
 			return self._notebook_storage.get_node_payload(self.node_id, payload_name).read()
 		else:
 			raise PayloadDoesNotExistError(payload_name)
-		
+	
+	def is_node_a_child(self, node):
+		p = node.parent
+		while p is not None:
+			if p == self:
+				return True
+			else:
+				p = p.parent
+		return False
+	
 	@property
 	def is_in_trash(self):
 		if self.parent is not None:
@@ -348,7 +375,7 @@ class ContentNode(NotebookNode):
 	def is_trash(self):
 		return False
 	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, after=None):
+	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, behind=None):
 #		if additional_payloads is None:
 #			additional_payloads = []
 		
@@ -367,11 +394,18 @@ class ContentNode(NotebookNode):
 				additional_payloads=additional_payloads,
 				is_dirty=True,
 				)
-		self.children.append(child)
-		
+		if behind is None:
+			self.children.append(child)
+		else:
+			try:
+				i = self.children.index(behind)
+				self.children.insert(i + 1, child)
+			except ValueError as e:
+				raise IllegalOperationError('Unknown child', e)
+	
 		return child
 	
-	def new_folder_child_node(self, node_id, title, after=None):
+	def new_folder_child_node(self, node_id, title, behind=None):
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
 		elif self.is_deleted_unsaved:
@@ -383,7 +417,14 @@ class ContentNode(NotebookNode):
 				parent=self,
 				title=title,
 				is_dirty=True)
-		self.children.append(child)
+		if behind is None:
+			self.children.append(child)
+		else:
+			try:
+				i = self.children.index(behind)
+				self.children.insert(i + 1, child)
+			except ValueError as e:
+				raise IllegalOperationError('Unknown child', e)
 		
 		return child
 	
@@ -396,6 +437,13 @@ class ContentNode(NotebookNode):
 	def set_main_payload(self, payload_data):
 		"""TODO"""
 		self.payloads[self.main_payload_name] = payload_data
+
+	def __repr__(self):
+		return '{cls}[{node_id}, {content_type}, {title}]'.format(
+				cls=self.__class__.__name__,
+				dirty='*' if self.is_dirty else '-',
+				**self.__dict__
+				)
 
 
 class FolderNode(NotebookNode):
@@ -420,6 +468,13 @@ class FolderNode(NotebookNode):
 				is_dirty=is_dirty,
 				)
 
+	def __repr__(self):
+		return '{cls}[{node_id}, {title}]'.format(
+				cls=self.__class__.__name__,
+				dirty='*' if self.is_dirty else '-',
+				**self.__dict__
+				)
+
 class TrashNode(FolderNode):
 	"""A trash node in a notebook. A trash node has no content.
 	"""
@@ -441,6 +496,13 @@ class TrashNode(FolderNode):
 				title=title,
 				is_dirty=is_dirty,
 				)
+
+	def __repr__(self):
+		return '{cls}[{node_id}, {title}]'.format(
+				cls=self.__class__.__name__,
+				dirty='*' if self.is_dirty else '-',
+				**self.__dict__
+				)
 	
 
 class NotebookError(Exception):
@@ -449,6 +511,7 @@ class NotebookError(Exception):
 
 class IllegalOperationError(NotebookError):
 	pass
+
 
 class InvalidStructureError(NotebookError):
 	pass

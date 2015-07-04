@@ -317,7 +317,7 @@ class NotebookTest(unittest.TestCase):
 			# Initialize Notebook with the mocked NotebookStorage.
 			Notebook(notebook_storage)
 	
-	def test_validation_parent_is_child(self):
+	def test_validation_parent_is_node_a_child(self):
 		"""Test a NotebookStorage with a root and a node that is its own parent."""
 		child_sn = StoredNode('child_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payload_names=[])
 		
@@ -441,6 +441,15 @@ class NotebookTest(unittest.TestCase):
 			
 class ContentFolderNodeTestBase(object):
 	def _create_node(self, parent=None, is_dirty=True):
+		"""Creates a node of the class under test."""
+		raise NotImplementedError()
+	
+	def _assert_proper_copy_call_on_mock(self, target_mock, original, with_subtree, behind):
+		"""Asserts that the proper method to copy a node of the class under test was invoked on a target mock object."""
+		raise NotImplementedError()
+	
+	def _get_proper_copy_method(self, target_mock):
+		"""Returns the proper method to copy a node of the class under test on a mock object."""
 		raise NotImplementedError()
 	
 	def test_is_root_1(self):
@@ -486,6 +495,34 @@ class ContentFolderNodeTestBase(object):
 		node = self._create_node(parent=None, is_dirty=False)
 		
 		self.assertEquals(False, node.is_in_trash)
+	
+	def test_is_node_a_child_1(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		child = Mock(spec=NotebookNode)
+		child.parent = node
+		
+		self.assertEquals(True, node.is_node_a_child(child))
+	
+	def test_is_node_a_child_2(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		child1 = Mock(spec=NotebookNode)
+		child1.parent = node
+		child11 = Mock(spec=NotebookNode)
+		child11.parent = child1
+		
+		self.assertEquals(True, node.is_node_a_child(child11))
+	
+	def test_is_node_a_child_3(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		
+		self.assertEquals(False, node.is_node_a_child(node))
+	
+	def test_is_node_a_child_4(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		other_node = Mock(spec=NotebookNode)
+		other_node.parent = None
+		
+		self.assertEquals(False, node.is_node_a_child(other_node))
 	
 	def test_delete_without_children(self):
 		parent = Mock(spec=NotebookNode)
@@ -559,7 +596,7 @@ class ContentFolderNodeTestBase(object):
 				content_type=CONTENT_TYPE_HTML,
 				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
- 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				 additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
 		
 		# Verify the parent.
@@ -590,8 +627,8 @@ class ContentFolderNodeTestBase(object):
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-	 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-	 				)
+					 additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+					 )
 	
 	def test_new_content_child_node_in_trash_2(self):
 		parent = Mock(spec=NotebookNode)
@@ -607,8 +644,8 @@ class ContentFolderNodeTestBase(object):
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-	 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-	 				)
+					 additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+					 )
 	
 	def test_new_content_child_node_if_deleted_unsaved(self):
 		parent = Mock(spec=NotebookNode)
@@ -626,10 +663,10 @@ class ContentFolderNodeTestBase(object):
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-	 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-	 				)
+					 additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+					 )
 	
-	def test_new_content_child_node_after_sibling(self):
+	def test_new_content_child_node_behind_sibling(self):
 		node = self._create_node(parent=None, is_dirty=False)
 		
 		child1 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
@@ -641,12 +678,26 @@ class ContentFolderNodeTestBase(object):
 				content_type=CONTENT_TYPE_HTML,
 				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
- 				additional_payloads=[],
- 				after=child1,
+				 additional_payloads=[],
+				 behind=child1,
 				)
 		
 		# Verify the parent.
 		self.assertEquals([child1, child3, child2], node.children)
+	
+	def test_new_content_child_node_behind_nonexistent_sibling(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		
+		with self.assertRaises(IllegalOperationError):
+			# Add content node.
+			node.new_content_child_node(
+					node_id=DEFAULT_ID,
+					content_type=CONTENT_TYPE_HTML,
+					title=DEFAULT_TITLE,
+					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+					 additional_payloads=[],
+					 behind=object(),
+					)
 		
 	def test_new_folder_child_node(self):
 		node = self._create_node(parent=None, is_dirty=False)
@@ -681,7 +732,7 @@ class ContentFolderNodeTestBase(object):
 			node.new_folder_child_node(
 					node_id=DEFAULT_ID,
 					title=DEFAULT_TITLE,
-	 				)
+					 )
 	
 	def test_new_folder_child_node_in_trash_2(self):
 		parent = Mock(spec=NotebookNode)
@@ -695,7 +746,7 @@ class ContentFolderNodeTestBase(object):
 			node.new_folder_child_node(
 					node_id=DEFAULT_ID,
 					title=DEFAULT_TITLE,
-	 				)
+					 )
 	
 	def test_new_folder_child_node_if_deleted_unsaved(self):
 		parent = Mock(spec=NotebookNode)
@@ -711,7 +762,145 @@ class ContentFolderNodeTestBase(object):
 			node.new_folder_child_node(
 					node_id=DEFAULT_ID,
 					title=DEFAULT_TITLE,
-	 				)
+					 )
+	
+	def test_new_folder_child_node_behind_sibling(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		
+		child1 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child2 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		
+		# Add folder node.
+		child3 = node.new_folder_child_node(
+				node_id=DEFAULT_ID,
+				title=DEFAULT_TITLE,
+				 behind=child1,
+				)
+		
+		# Verify the parent.
+		self.assertEquals([child1, child3, child2], node.children)
+	
+	def test_new_folder_child_node_behind_nonexistent_sibling(self):
+		node = self._create_node(parent=None, is_dirty=False)
+		
+		with self.assertRaises(IllegalOperationError):
+			# Add folder node.
+			node.new_folder_child_node(
+					node_id=DEFAULT_ID,
+					title=DEFAULT_TITLE,
+					 behind=object(),
+					)
+	
+	def test_copy_behind_sibling(self):
+		# Create the original and target nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		target = Mock(spec=NotebookNode)
+		child1 = Mock(spec=NotebookNode)
+		child2 = Mock(spec=NotebookNode)
+		target.children = [child1, child2]
+		target.parent = None
+		target.is_trash = False
+		target.is_in_trash = False
+		
+		# Copy the node.
+		original.copy(target, with_subtree=False, behind=child1)
+		
+		self._assert_proper_copy_call_on_mock(target_mock=target, original=original, behind=child1)
+	
+	def test_copy_to_child(self):
+		"""Tests copying a single node to one of its children."""
+		
+		# Create the original and target nodes. The original has two child nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		child1 = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1.parent = original
+		child11 = Mock(spec=NotebookNode)
+		child11.parent = child1
+		target = child11
+		target.is_trash = False
+		target.is_in_trash = False
+		
+		# Verify the original.
+		self.assertEquals(True, original.can_copy(target, with_subtree=False))
+		
+		# Copy the node.
+		original.copy(target, with_subtree=False)
+		
+		self._assert_proper_copy_call_on_mock(target_mock=target, original=original, behind=None)
+	
+	def test_copy_to_trash_1(self):
+		# Create the original and target nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		target = Mock(spec=NotebookNode)
+		target.is_trash = True
+		
+		# Verify the original.
+		self.assertEquals(False, original.can_copy(target, with_subtree=False))
+		
+		with self.assertRaises(IllegalOperationError):
+			# Copy the node.
+			original.copy(target, with_subtree=False)
+	
+	def test_copy_to_trash_2(self):
+		# Create the original and target nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		target = Mock(spec=NotebookNode)
+		target.is_in_trash = True
+		
+		# Verify the original.
+		self.assertEquals(False, original.can_copy(target, with_subtree=False))
+		
+		with self.assertRaises(IllegalOperationError):
+			# Copy the node.
+			original.copy(target, with_subtree=False)
+	
+	def test_copy_with_subtree(self):
+		"""Tests copying a node and its children."""
+		
+		# Create the original and target nodes. The original has two child nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		child1 = Mock(spec=NotebookNode)
+		child2 = Mock(spec=NotebookNode)
+		original.children = [child1, child2]
+		target = Mock(spec=NotebookNode)
+		target.parent = None
+		target.is_trash = False
+		target.is_in_trash = False
+		copy = Mock(spec=NotebookNode)
+		def side_effect(*args, **kwargs):
+			return copy
+		self._get_proper_copy_method(target).side_effect = side_effect
+		
+		# Copy the node.
+		original.copy(target, with_subtree=True)
+		
+		# Verify the children.
+		child1.copy.assert_called_once_with(copy, with_subtree=True)
+		child2.copy.assert_called_once_with(copy, with_subtree=True)
+	
+	def test_copy_with_subtree_to_child(self):
+		"""Tests copying a node and its children to one of its children."""
+		
+		# Create the original and target nodes. The original has two child nodes.
+		original = self._create_node(parent=None, is_dirty=False)
+		child1 = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1.parent = original
+		child11 = Mock(spec=NotebookNode)
+		child11.parent = child1
+		target = child11
+		target.is_trash = False
+		target.is_in_trash = False
+		
+		# Verify the original.
+		self.assertEquals(False, original.can_copy(target, with_subtree=True))
+		
+		with self.assertRaises(IllegalOperationError):
+			# Copy the node.
+			original.copy(target, with_subtree=True)
+		
+		# Verify the target.
+		self.assertEquals(False, self._get_proper_copy_method(target).called)
+
 	
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
@@ -737,6 +926,21 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				is_dirty=is_dirty,
 				)
 	
+	def _assert_proper_copy_call_on_mock(self, target_mock, original, behind):
+		m = AllButOneUuidMatcher(original.node_id)
+		
+		target_mock.new_content_child_node.assert_called_once_with(
+				node_id=m,
+				content_type=original.content_type,
+				title=original.title,
+				main_payload=(original.main_payload_name, original.get_payload(original.main_payload_name)),
+				additional_payloads=[(additional_payload_name, original.get_payload(additional_payload_name)) for additional_payload_name in original.additional_payload_names],
+				behind=behind
+				)
+	
+	def _get_proper_copy_method(self, target_mock):
+		return target_mock.new_content_child_node
+
 	def test_add_additional_payload(self):
 		node = ContentNode(
 				notebook_storage=None,
@@ -903,7 +1107,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def test_copy(self):
 		"""Tests copying a single node without its children."""
 		
-		# Create the original and target nodes. The source has a child node.
+		# Create the original and target nodes. The original has a child node.
 		original = ContentNode(
 				notebook_storage=None,
 				node_id=new_node_id(),
@@ -916,6 +1120,9 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				)
 		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
+		target.parent = None
+		target.is_trash = False
+		target.is_in_trash = False
 		
 		# Verify the original.
 		self.assertEquals(True, original.can_copy(target, with_subtree=False))
@@ -924,20 +1131,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		original.copy(target, with_subtree=False)
 		
 		# Verify the notebook, the parent and the copy.
-		target.new_content_child_node.assert_called_once_with(
-				node_id=mock.ANY,
-				content_type=DEFAULT_CONTENT_TYPE,
-				title=DEFAULT_TITLE,
-				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-				)
+		self._assert_proper_copy_call_on_mock(target_mock=target, original=original, behind=None)
 	
 	def test_copy_payload_in_storage(self):
 		"""Tests copying a single node without its children."""
 		
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		
-		# Create the original and target nodes. The source has a child node.
+		# Create the original and target nodes. The original has a child node.
 		original = ContentNode(
 				notebook_storage=notebook_storage,
 				node_id=new_node_id(),
@@ -950,6 +1151,9 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				)
 		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
+		target.parent = None
+		target.is_trash = False
+		target.is_in_trash = False
 		
 		def side_effect_get_node_payload(node_id, payload_name):
 			if node_id == original.node_id and payload_name == DEFAULT_HTML_PAYLOAD_NAME:
@@ -966,31 +1170,20 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		# Copy the node.
 		original.copy(target, with_subtree=False)
 		
-		# Verify the notebook, the parent and the copy.
-		target.new_content_child_node.assert_called_once_with(
-				node_id=mock.ANY,
-				content_type=DEFAULT_CONTENT_TYPE,
-				title=DEFAULT_TITLE,
-				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-				)
-
-	
-	# Further tests:
-	# - copy with payload in storage
-
+		# Verify the target.
+		self._assert_proper_copy_call_on_mock(target_mock=target, original=original, behind=None)
 
 
 # Utilities
 
 class AnyUuidMatcher(object):
-	def __init__(self):
-		self.last_match = None
-	
 	def __eq__(self, other):
 		matcher = re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', other)
-		if matcher is not None:
-			self.last_match = other
-			return True
-		else:
-			return False
+		return matcher is not None
+
+class AllButOneUuidMatcher(AnyUuidMatcher):
+	def __init__(self, uuid):
+		self.uuid = uuid
+	
+	def __eq__(self, other):
+		return super(AllButOneUuidMatcher, self).__eq__(other) and other != self.uuid

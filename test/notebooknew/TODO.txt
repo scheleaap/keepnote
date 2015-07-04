@@ -58,12 +58,13 @@ x	test_new_content_child_node_if_deleted_unsaved
 x	test_new_folder_child_node
 x	test_new_folder_child_node_in_trash
 x	test_new_folder_child_node_if_deleted_unsaved
-	test_copy_after_sibling
-	test_copy_to_trash
-	test_copy_to_node_in_trash
-	test_copy_to_notebook
-	test_copy_subtree
-	test_copy_subtree_to_child
+x	test_copy_after_sibling
+x	test_copy_to_trash
+x	test_copy_to_node_in_trash
+-	test_copy_to_notebook
+x	test_copy_with_subtree
+x	test_copy_with_subtree_to_child
+	test: ID of copied node different
 	test_move
 	test_move_after_sibling
 	test_move_to_trash

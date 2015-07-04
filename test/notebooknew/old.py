@@ -89,50 +89,6 @@ class RootContentFolderNodeTestBase(object):
 	def _get_notebook_and_node(self):
 		raise NotImplementedError()
 	
-	def test_copy_after_sibling(self):
-		"""Tests copying a node, placing it in a specified location."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Create a target node with two children.
-		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target_child1 = target.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target_child2 = target.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Verify the original.
-		self.assertEquals(True, original.can_copy(target, behind=target_child1, with_subtree=False))
-		
-		# Copy the node.
-		copy = original.copy(target, behind=target_child1, with_subtree=False)
-		
-		# Verify the parent.
-		self.assertEquals([target_child1, copy, target_child2], target.children)
-	
-	def test_copy_to_trash(self):
-		"""Tests copying a node to the trash."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Verify the original.
-		self.assertEquals(False, original.can_copy(notebook.trash))
-		
-		with self.assertRaises(InvalidStructureError):
-			# Copy the node.
-			copy = original.copy(notebook.trash)
-	
-	def test_copy_to_node_in_trash(self):
-		"""Tests copying a node to a node in the trash."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Create a target node.
-		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target.trash()
-		
-		# Verify the original.
-		self.assertEquals(False, original.can_copy(target))
-		
-		with self.assertRaises(InvalidStructureError):
-			# Copy the node.
-			copy = original.copy(target)
-	
 	def test_copy_to_notebook_and_save(self):
 		"""Test copying a node to another notebook."""
 		notebook1, original = self._get_notebook_and_node()
@@ -169,21 +125,6 @@ class RootContentFolderNodeTestBase(object):
 		self.assertEquals(False, notebook2.is_dirty)
 		self.assertEquals(False, node.is_dirty)
 	
-	def test_copy_subtree_to_child(self):
-		"""Tests copying a node with its subtree to one of its children."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Make sure that the node to be copied has a child node.
-		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Verify the original.
-		self.assertEquals(False, original.can_copy(target, with_subtree=True))
-		
-		with self.assertRaises(InvalidStructureError):
-			# Copy the node.
-			copy = original.copy(target, with_subtree=True)
-
 class ContentFolderNodeTestBase(RootContentFolderNodeTestBase):
 	def test_delete_and_save(self):
 		"""Tests deleting a node."""
@@ -215,28 +156,6 @@ class ContentFolderNodeTestBase(RootContentFolderNodeTestBase):
 		
 		# Verify the notebook and the node.
 		self.assertEquals(False, notebook.is_dirty)
-	
-	def test_copy_subtree(self):
-		"""Tests copying a node and its children."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Make sure that the node to be copied has child nodes and create a target node.
-		original_child1 = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		original_child11 = original_child1.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Copy the node.
-		copy = original.copy(target, with_subtree=True)
-		
-		# Verify the copy's child.
-		copy_child1 = copy.children[0]
-		copy_child11 = copy_child1.children[0]
-		self.assert_nodes_equal(original_child1, copy_child1, ignore=['node_id', 'children', 'is_dirty'])
-		self.assert_nodes_equal(original_child11, copy_child11, ignore=['node_id', 'is_dirty'])
-		self.assertNotEquals(original_child1.node_id, copy_child1.node_id)
-		self.assertNotEquals(original_child11.node_id, copy_child11.node_id)
-		self.assertEquals(True, copy_child1.is_dirty)
-		self.assertEquals(True, copy_child11.is_dirty)
 	
 	def test_move_and_save(self):
 		"""Tests moving a node and saving the notebook."""
@@ -460,7 +379,7 @@ class TrashNodeTestBase(unittest.TestCase):
 			# Delete the node.
 			node = notebook.trash.delete()
 
-TODO: HIER BEZIG
+#TODO: HIER BEZIG
 	
 	def test_copy_and_save(self):
 		"""Tests copying the trash node without its children and saving the notebook."""
@@ -501,7 +420,7 @@ TODO: HIER BEZIG
 		self.assertEquals(False, notebook.is_dirty)
 		self.assertEquals(False, node.is_dirty)
 	
-	TODO: HIER BEZIG MET OMBOUWEN VOOR TRASH
+	#TODO: HIER BEZIG MET OMBOUWEN VOOR TRASH
 	
 	def test_copy_after_sibling(self):
 		"""Tests copying a node, placing it in a specified location."""
@@ -583,22 +502,6 @@ TODO: HIER BEZIG
 		self.assertEquals(False, notebook2.is_dirty)
 		self.assertEquals(False, node.is_dirty)
 	
-	def test_copy_subtree_to_child(self)
-		"""Tests copying a node with its subtree to one of its children."""
-		notebook, original = self._get_notebook_and_node()
-		
-		# Make sure that the node to be copied has a child node.
-		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Verify the original.
-		self.assertEquals(False, original.can_copy(target, with_subtree=True))
-		
-		with self.assertRaises(InvalidStructureError):
-			# Copy the node.
-			copy = original.copy(target, with_subtree=True)
-
- 
 	def test_move(self):
 		"""Tests moving the trash."""
 		notebook, node = self._get_notebook_and_node()
