@@ -1,7 +1,8 @@
+from collections import OrderedDict
+import io
 import os
 import uuid
 
-from collections import OrderedDict
 from keepnote.pref import Pref
 from keepnote.notebooknew.storage import StoredNode
 
@@ -257,6 +258,11 @@ class NotebookNode(object):
 		@param behind: TODO
 #		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
 		"""
+		raise NotImplementedError('TODO')
+	
+	def save(self):
+		"""TODO"""
+		raise NotImplementedError('TODO')
 
 
 class ContentNode(NotebookNode):
@@ -313,6 +319,7 @@ class ContentNode(NotebookNode):
 		
 		self.additional_payload_names.append(payload_name)
 		self.payloads[payload_name] = payload_data
+		self.is_dirty = True
 		
 	def can_add_new_content_child_node(self):
 		"""TODO"""
@@ -476,10 +483,28 @@ class ContentNode(NotebookNode):
 		self.additional_payload_names.remove(payload_name)
 		if payload_name in self.payloads:
 			del self.payloads[payload_name]
+		self.is_dirty = True
+	
+	def save(self):
+		if not self.is_dirty:
+			return
+		attributes = {
+				TITLE_ATTRIBUTE: self.title,
+				MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
+				}
+		if self.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+		self._notebook_storage.add_node(
+				node_id=self.node_id,
+				content_type=self.content_type,
+				attributes=attributes,
+				payloads=[(payload_name, io.BytesIO(payload_data)) for (payload_name, payload_data) in self.payloads.iteritems()])
+		self.is_dirty = False
 	
 	def set_main_payload(self, payload_data):
 		"""TODO"""
 		self.payloads[self.main_payload_name] = payload_data
+		self.is_dirty = True
 
 	def __repr__(self):
 		return '{cls}[{node_id}, {content_type}, {title}]'.format(

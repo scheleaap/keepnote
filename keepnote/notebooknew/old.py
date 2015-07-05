@@ -5,12 +5,6 @@ from collections import OrderedDict
 from keepnote.pref import Pref
 from keepnote.notebooknew.storage import StoredNode
 
-# Content types
-CONTENT_TYPE_HTML = u"text/html"
-CONTENT_TYPE_TRASH = u"application/x-notebook-trash"
-CONTENT_TYPE_FOLDER = u"application/x-notebook-dir"
-#CONTENT_TYPE_UNKNOWN = u"application/x-notebook-unknown"
-
 # Attribute names
 PARENT_ID_ATTRIBUTE = 'parent_id'
 TITLE_ATTRIBUTE = 'title'
@@ -286,12 +280,3 @@ class ContentNode(NotebookNode):
 				dirty='*' if self.is_dirty else '-',
 				**self.__dict__
 				)
-
-class InvalidStructureError(Exception):
-	pass
-
-class PayloadAlreadyExistsError(Exception):
-	pass
-
-class PayloadDoesNotExistError(Exception):
-	pass

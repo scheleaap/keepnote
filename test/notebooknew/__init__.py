@@ -1084,7 +1084,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1095,14 +1095,15 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		node.add_additional_payload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)
 		
+		self.assertEquals(True, node.is_dirty)
 		self.assertEquals([DEFAULT_JPG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEquals(DEFAULT_PNG_PAYLOAD, node.get_payload(DEFAULT_PNG_PAYLOAD_NAME))		
 	
-	def test_add_additional_payload_existing1(self):
+	def test_add_additional_payload_existing_1(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1113,12 +1114,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		with self.assertRaises(PayloadAlreadyExistsError):
 			node.add_additional_payload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD)
+		
+		self.assertEquals(False, node.is_dirty)
 	
 	def test_add_additional_payload_existing2(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1129,6 +1132,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		with self.assertRaises(PayloadAlreadyExistsError):
 			node.add_additional_payload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)
+		
+		self.assertEquals(False, node.is_dirty)
 	
 	def test_get_payload_from_storage(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
@@ -1136,7 +1141,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1158,7 +1163,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1174,7 +1179,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1186,6 +1191,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node.add_additional_payload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)
 		node.remove_additional_payload(DEFAULT_PNG_PAYLOAD_NAME)
 		
+		self.assertEquals(True, node.is_dirty)
 		self.assertEquals([], node.additional_payload_names)
 		with self.assertRaises(PayloadDoesNotExistError):
 			node.get_payload(DEFAULT_PNG_PAYLOAD_NAME)
@@ -1196,7 +1202,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1214,6 +1220,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		node.remove_additional_payload(DEFAULT_PNG_PAYLOAD_NAME)
 		
+		self.assertEquals(True, node.is_dirty)
 		self.assertEquals([], node.additional_payload_names)
 		with self.assertRaises(PayloadDoesNotExistError):
 			node.get_payload(DEFAULT_PNG_PAYLOAD_NAME)
@@ -1222,7 +1229,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1233,13 +1240,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		node.set_main_payload('new payload')
 		
+		self.assertEquals(True, node.is_dirty)
 		self.assertEquals('new payload', node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))		
 	
 	def test_set_main_payload_existing_in_storage(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1250,6 +1258,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		node.set_main_payload('new payload')
 		
+		self.assertEquals(True, node.is_dirty)
 		self.assertEquals('new payload', node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))		
 	
 	def test_copy(self):
@@ -1259,7 +1268,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		original = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1296,7 +1305,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		original = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,
-				node_id=new_node_id(),
+				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1332,6 +1341,97 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		# Verify the result and the parent.
 		self.assertEqual(copy, result)
 		self._assert_proper_copy_call_on_mock(target_mock=target, original=original, behind=None)
+	
+	def test_save_not_dirty(self):
+		# Create a mocked NotebookStorage.
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the node and the parent.
+		node = ContentNode(
+				notebook_storage=notebook_storage,
+				notebook=None,
+				node_id=DEFAULT_ID,
+				content_type=DEFAULT_CONTENT_TYPE,
+				parent=None,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[],
+				is_dirty=False,
+				)
+		
+		# Save the node.
+		node.save()
+		
+		# Verify the storage.
+		self.assertEquals(False, notebook_storage.add_node.called)
+		
+	def test_save_new(self):
+		# Create a mocked NotebookStorage.
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the node and the parent.
+		parent = Mock(spec=NotebookNode)
+		parent.node_id = new_node_id()
+		node = ContentNode(
+				notebook_storage=notebook_storage,
+				notebook=None,
+				node_id=DEFAULT_ID,
+				content_type=DEFAULT_CONTENT_TYPE,
+				parent=parent,
+				title=DEFAULT_TITLE,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				is_dirty=True,
+				)
+		
+		# Save the node.
+		node.save()
+		
+		# Verify the storage.
+		notebook_storage.add_node.assert_called_once_with(
+				node_id=DEFAULT_ID,
+				content_type=DEFAULT_CONTENT_TYPE,
+				attributes={
+						PARENT_ID_ATTRIBUTE: parent.node_id,
+						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
+						},
+				payloads=PayloadStorageMatcher([
+						(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)),
+						(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))
+						])
+				)
+		
+		# Verify the node.
+		self.assertEquals(False, node.is_dirty)
+	
+# 	def test_save_add_additional_payload_1(self):
+# 		# Create a mocked NotebookStorage.
+# 		notebook_storage = Mock(spec=storage.NotebookStorage)
+# 		
+# 		# Create the node.
+# 		node = ContentNode(
+# 				notebook_storage=notebook_storage,
+# 				notebook=None,
+# 				node_id=DEFAULT_ID,
+# 				content_type=DEFAULT_CONTENT_TYPE,
+# 				parent=None,
+# 				title=DEFAULT_TITLE,
+# 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
+# 				additional_payload_names=[DEFAULT_JPG_PAYLOAD_NAME],
+# 				is_dirty=False
+# 				)
+# 		node.add_additional_payload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)
+# 		
+# 		# Save the node.
+# 		node.save()
+# 		
+# 		# Verify the storage.
+# 		notebook_storage.add_node_payload.assert_called_once_with(self, DEFAULT_ID, DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)
+# 		
+# 		# Verify the node.
+# 		self.assertEquals(False, node.is_dirty)
+		
 
 
 # Utilities
@@ -1347,3 +1447,17 @@ class AllButOneUuidMatcher(AnyUuidMatcher):
 	
 	def __eq__(self, other):
 		return super(AllButOneUuidMatcher, self).__eq__(other) and other != self.uuid
+
+class PayloadStorageMatcher(object):
+	def __init__(self, expected):
+		self.expected = {}
+		for payload_name, payload_data_file in expected:
+			self.expected[payload_name] = payload_data_file.read()
+	
+	def __eq__(self, other):
+		actual = {}
+		for payload_name, payload_data_file in other:
+			actual[payload_name] = payload_data_file.read()
+		
+		return self.expected == actual
+		

@@ -71,9 +71,6 @@ x	test_move_root
 x	test_move_to_child
 x	test_move_to_different_notebook
 
-	test_save_creation
-	test_save_modification
-	test_save_deletion
 	test_save_with_dirty_parent
 	test_save_with_dirty_children
 
@@ -91,8 +88,13 @@ x	test_set_main_payload
 x	test_set_main_payload_existing_in_storage
 x	test_copy
 x	test_copy_payload_in_storage
-
-	test saving of add/remove/set payload
+x	test_save_new
+	test_save_add_additional_payload
+	test_save_remove_additional_payload
+	test_save_set_main_payload
+	test_save_delete
+	test_save_move
+	test_save_root (omdat parent is None)
 
 FolderTest
 	test_incorrect_content_type
