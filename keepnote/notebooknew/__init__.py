@@ -6,6 +6,20 @@ import uuid
 from keepnote.pref import Pref
 from keepnote.notebooknew.storage import StoredNode
 
+__all__ = [
+		'Notebook',
+		'NotebookNode',
+		'ContentNode',
+		'FolderNode',
+		'TrashNode',
+		'NotebookError',
+		'IllegalArgumentCombinationError',
+		'IllegalOperationError',
+		'InvalidStructureError',
+		'PayloadAlreadyExistsError',
+		'PayloadDoesNotExistError'
+		]
+
 # Content types
 CONTENT_TYPE_HTML = u"text/html"
 CONTENT_TYPE_TRASH = u"application/x-notebook-trash"
@@ -68,7 +82,7 @@ class Notebook(object):
 						node_id=stored_node.node_id,
 						parent=None,
 						title=title,
-						is_dirty=False,
+						loaded_from_storage=True
 						)
 			elif stored_node.content_type == CONTENT_TYPE_TRASH:
 				notebook_node = TrashNode(
@@ -77,7 +91,7 @@ class Notebook(object):
 						node_id=stored_node.node_id,
 						parent=None,
 						title=title,
-						is_dirty=False,
+						loaded_from_storage=True
 						)
 			else:
 				main_payload_name = stored_node.attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE]
@@ -89,9 +103,9 @@ class Notebook(object):
 						content_type=stored_node.content_type,
 						parent=None,
 						title=title,
+						loaded_from_storage=True,
 						main_payload_name=main_payload_name,
 						additional_payload_names=additional_payload_names,
-						is_dirty=False,
 						)
 			nodes_by_id[stored_node.node_id] = (stored_node, notebook_node)
 		
@@ -137,7 +151,7 @@ class Notebook(object):
 					node_id=node_id,
 					parent=self.root,
 					title='', # TODO
-					is_dirty=False,
+					loaded_from_storage=True
 					)
 			self.trash = notebook_node
 		
@@ -166,29 +180,45 @@ class NotebookNode(object):
 	@ivar parent: The parent of the node.
 	@ivar title: The title of the node.
 	@ivar is_dirty: Indicates whether the node has changed since it was last saved.
-	@ivar is_deleted_unsaved: Indicates whether the node has been deleted from the notebook but not deleted from storage yet. 
+	@ivar is_deleted: Indicates whether the node has been deleted from the notebook. 
 	"""
+	
+	class ChangeStateConstant():
+		"""A constant representing some kind of change state in a NotebookNode."""
+		
+		def __init__(self, name):
+			self.name = name
+		
+		def __repr__(self):
+			return self.name
+	
+	# Change constants
+	NEW = ChangeStateConstant('NEW')
+	DELETED = ChangeStateConstant('DELETED')
 
-	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, is_dirty=True):
+	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
 		@param node_id: The id of the new node.
 		@param content_type: The content type of node.
-		@param is_dirty: Indicates whether the node has changed since it was last saved.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
+		@param loaded_from_storage: TODO
 		"""
 		self._notebook_storage = notebook_storage
 		self._notebook = notebook
 		self.node_id = node_id
 		self.children = []
 		self.content_type = content_type
-		self.is_deleted_unsaved = False
-		self.is_dirty = is_dirty
+		self.is_dirty = not loaded_from_storage
+		self.is_deleted = False
 		self.parent = parent
 		self.title = title
+		self._unsaved_changes = []
+		if not loaded_from_storage:
+			self._unsaved_changes.append(NotebookNode.NEW)
 	
 	def can_add_new_content_child_node(self):
 		"""TODO"""
@@ -275,7 +305,7 @@ class ContentNode(NotebookNode):
 	
 	# TODO: Use classmethods for loading from storage / for creating new in memory
 
-	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, is_dirty, main_payload=None, additional_payloads=None, main_payload_name=None, additional_payload_names=None):
+	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage=None, main_payload=None, additional_payloads=None, main_payload_name=None, additional_payload_names=None, is_dirty=None):
 		"""Constructor.
 		
 		Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed.
@@ -286,6 +316,7 @@ class ContentNode(NotebookNode):
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
+		@param loaded_from_storage: TODO
 		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
 		@param additional_payloads: A list containing tuples consisting of paylad names and payload data.
 		@param main_payload_name: The name of the main payload.
@@ -299,16 +330,22 @@ class ContentNode(NotebookNode):
 				content_type=content_type,
 				parent=parent,
 				title=title,
-				is_dirty=is_dirty,
+				loaded_from_storage=loaded_from_storage,
 				)
+		if loaded_from_storage and (main_payload_name is None or additional_payload_names is None):
+			raise IllegalArgumentCombinationError()
+		elif not loaded_from_storage and (main_payload is None or additional_payloads is None):
+			raise IllegalArgumentCombinationError()
+		
 		if main_payload_name is not None:
 			self.main_payload_name = main_payload_name
 			self.additional_payload_names = additional_payload_names
-			self.payloads = OrderedDict()
+			self._payloads_to_store = OrderedDict()
 		else:
 			self.main_payload_name = main_payload[0]
 			self.additional_payload_names = [additional_payload[0] for additional_payload in additional_payloads]
-			self.payloads = OrderedDict([main_payload] + additional_payloads)
+			self._payloads_to_store = OrderedDict([main_payload] + additional_payloads)
+		self._payload_names_to_remove = []
 	
 	def add_additional_payload(self, payload_name, payload_data):
 		"""TODO"""
@@ -318,16 +355,16 @@ class ContentNode(NotebookNode):
 			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload_name))
 		
 		self.additional_payload_names.append(payload_name)
-		self.payloads[payload_name] = payload_data
+		self._payloads_to_store[payload_name] = payload_data
 		self.is_dirty = True
 		
 	def can_add_new_content_child_node(self):
 		"""TODO"""
-		return not self.is_in_trash and not self.is_deleted_unsaved
+		return not self.is_in_trash and not self.is_deleted
 	
 	def can_add_new_folder_child_node(self):
 		"""TODO"""
-		return not self.is_in_trash and not self.is_deleted_unsaved
+		return not self.is_in_trash and not self.is_deleted
 	
 	def can_copy(self, target, with_subtree):
 		if target.is_trash or target.is_in_trash:
@@ -368,13 +405,17 @@ class ContentNode(NotebookNode):
 		for child in self.children:
 			child.delete()
 		self.parent.children.remove(self)
-		self.is_deleted_unsaved = True
+		self.is_deleted = True
 		self.is_dirty = True
+		if NotebookNode.NEW in self._unsaved_changes:
+			self._unsaved_changes.remove(NotebookNode.NEW)
+		else:
+			self._unsaved_changes.append(NotebookNode.DELETED)
 	
 	def get_payload(self, payload_name):
 		"""TODO"""
-		if payload_name in self.payloads:
-			return self.payloads[payload_name]
+		if payload_name in self._payloads_to_store:
+			return self._payloads_to_store[payload_name]
 		elif payload_name == self.main_payload_name or payload_name in self.additional_payload_names:
 			return self._notebook_storage.get_node_payload(self.node_id, payload_name).read()
 		else:
@@ -429,7 +470,7 @@ class ContentNode(NotebookNode):
 		
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
-		elif self.is_deleted_unsaved:
+		elif self.is_deleted:
 			raise IllegalOperationError('Cannot add a child to a deleted node')
 			
 		child = ContentNode(
@@ -439,9 +480,9 @@ class ContentNode(NotebookNode):
 				content_type=content_type,
 				parent=self,
 				title=title,
+				loaded_from_storage=False,
 				main_payload=main_payload,
-				additional_payloads=additional_payloads,
-				is_dirty=True,
+				additional_payloads=additional_payloads
 				)
 		if behind is None:
 			self.children.append(child)
@@ -457,7 +498,7 @@ class ContentNode(NotebookNode):
 	def new_folder_child_node(self, node_id, title, behind=None):
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
-		elif self.is_deleted_unsaved:
+		elif self.is_deleted:
 			raise IllegalOperationError('Cannot add a child to a deleted node')
 			
 		child = FolderNode(
@@ -466,7 +507,8 @@ class ContentNode(NotebookNode):
 				node_id=node_id,
 				parent=self,
 				title=title,
-				is_dirty=True)
+				loaded_from_storage=False
+				)
 		if behind is None:
 			self.children.append(child)
 		else:
@@ -481,29 +523,48 @@ class ContentNode(NotebookNode):
 	def remove_additional_payload(self, payload_name):
 		"""TODO"""
 		self.additional_payload_names.remove(payload_name)
-		if payload_name in self.payloads:
-			del self.payloads[payload_name]
+		if payload_name in self._payloads_to_store:
+			del self._payloads_to_store[payload_name]
+		else:
+			self._payload_names_to_remove.append(payload_name)
 		self.is_dirty = True
 	
 	def save(self):
-		if not self.is_dirty:
-			return
-		attributes = {
-				TITLE_ATTRIBUTE: self.title,
-				MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
-				}
-		if self.parent is not None:
-			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
-		self._notebook_storage.add_node(
-				node_id=self.node_id,
-				content_type=self.content_type,
-				attributes=attributes,
-				payloads=[(payload_name, io.BytesIO(payload_data)) for (payload_name, payload_data) in self.payloads.iteritems()])
-		self.is_dirty = False
+#		if not self.is_dirty:
+#			return
+		if NotebookNode.NEW in self._unsaved_changes:
+			attributes = {
+					TITLE_ATTRIBUTE: self.title,
+					MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
+					}
+			if self.parent is not None:
+				attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+			self._notebook_storage.add_node(
+					node_id=self.node_id,
+					content_type=self.content_type,
+					attributes=attributes,
+					payloads=[(payload_name, io.BytesIO(payload_data)) for (payload_name, payload_data) in self._payloads_to_store.iteritems()])
+			self.is_dirty = False
+			self._payloads_to_store.clear()
+			self._unsaved_changes.remove(NotebookNode.NEW)
+		elif NotebookNode.DELETED in self._unsaved_changes:
+			self._notebook_storage.remove_node(self.node_id)
+			self.is_dirty = False
+			self._unsaved_changes.remove(NotebookNode.DELETED)
+		else:
+			for payload_name, payload_data in self._payloads_to_store.items():
+				self._notebook_storage.add_node_payload(self.node_id, payload_name, io.BytesIO(payload_data))
+				del self._payloads_to_store[payload_name]
+			self.is_dirty = False
+		for payload_name in list(self._payload_names_to_remove):
+			self._notebook_storage.remove_node_payload(self.node_id, payload_name)
+			self._payload_names_to_remove.remove(payload_name)
 	
 	def set_main_payload(self, payload_data):
 		"""TODO"""
-		self.payloads[self.main_payload_name] = payload_data
+		self._payloads_to_store[self.main_payload_name] = payload_data
+		if self.main_payload_name not in self._payload_names_to_remove:
+			self._payload_names_to_remove.append(self.main_payload_name)
 		self.is_dirty = True
 
 	def __repr__(self):
@@ -518,7 +579,7 @@ class FolderNode(NotebookNode):
 	"""A folder node in a notebook. A folder node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, node_id, parent, title, is_dirty):
+	def __init__(self, notebook_storage, notebook, node_id, parent, title, loaded_from_storage):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
@@ -526,7 +587,7 @@ class FolderNode(NotebookNode):
 		@param node_id: The id of the new node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
-		@param is_dirty: Indicates whether the node has changed since it was last saved.
+		@param loaded_from_storage: TODO
 		"""
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
@@ -535,7 +596,7 @@ class FolderNode(NotebookNode):
 				content_type=CONTENT_TYPE_FOLDER,
 				parent=parent,
 				title=title,
-				is_dirty=is_dirty,
+				loaded_from_storage=loaded_from_storage
 				)
 
 	def __repr__(self):
@@ -549,7 +610,7 @@ class TrashNode(FolderNode):
 	"""A trash node in a notebook. A trash node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, node_id, parent, title, is_dirty):
+	def __init__(self, notebook_storage, notebook, node_id, parent, title, loaded_from_storage):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
@@ -557,7 +618,7 @@ class TrashNode(FolderNode):
 		@param node_id: The id of the new node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
-		@param is_dirty: Indicates whether the node has changed since it was last saved.
+		@param loaded_from_storage: TODO
 		"""
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
@@ -566,7 +627,7 @@ class TrashNode(FolderNode):
 				content_type=CONTENT_TYPE_TRASH,
 				parent=parent,
 				title=title,
-				is_dirty=is_dirty,
+				loaded_from_storage=loaded_from_storage,
 				)
 
 	def __repr__(self):
@@ -578,6 +639,10 @@ class TrashNode(FolderNode):
 	
 
 class NotebookError(Exception):
+	pass
+
+
+class IllegalArgumentCombinationError(Exception):
 	pass
 
 

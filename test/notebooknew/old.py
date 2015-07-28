@@ -185,7 +185,7 @@ class RootNodeTestBase(unittest.TestCase):
 			# Delete the node.
 			node = notebook.root.delete()
 	
-	def test_copy_subtree(self)
+	def test_copy_subtree(self):
 		"""Tests copying the root and its children, including the trash."""
 		notebook, root = self._get_notebook_and_node()
 		
@@ -201,7 +201,7 @@ class RootNodeTestBase(unittest.TestCase):
 		copy_trash_child = copy.children[0]
 		self.assert_nodes_equal(root_trash_child, copy_trash_child, ignore=['node_id', 'content_type', 'is_dirty'])
 		self.assertNotEquals(root_trash_child.node_id, copy_trash_child.node_id)
-		self.assertEqual(CONTENT_TYPE_FOLDER, copy_trash_child.content_type
+		self.assertEqual(CONTENT_TYPE_FOLDER, copy_trash_child.content_type)
 		self.assertEquals(True, copy_trash_child.is_dirty)
 		
 		copy_folder_child = copy.children[1]
@@ -209,7 +209,7 @@ class RootNodeTestBase(unittest.TestCase):
 		self.assertNotEquals(root_folder_child.node_id, copy_folder_child.node_id)
 		self.assertEquals(True, root_folder_child.is_dirty)
 	
-	def test_move(self)
+	def test_move(self):
 		"""Tests moving the root."""
 		notebook, node = self._get_notebook_and_node()
 		
@@ -217,7 +217,7 @@ class RootNodeTestBase(unittest.TestCase):
 		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
 		
 		# Verify the node.
-		self.assertEquals(False, node.can_move(target)
+		self.assertEquals(False, node.can_move(target))
 		
 		with self.assertRaises(InvalidStructureError):
 			# Move the node.
@@ -339,7 +339,7 @@ class TrashNodeTestBase(unittest.TestCase):
 		# Verify the parent.
 		self.assertEquals([target_child1, copy, target_child2], target.children)
 	
-	def test_copy_to_trash(self)
+	def test_copy_to_trash(self):
 		"""Tests copying a node to the trash."""
 		notebook, original = self._get_notebook_and_node()
 		
@@ -350,7 +350,7 @@ class TrashNodeTestBase(unittest.TestCase):
 			# Copy the node.
 			copy = original.copy(notebook.trash)
 	
-	def test_copy_to_node_in_trash(self)
+	def test_copy_to_node_in_trash(self):
 		"""Tests copying a node to a node in the trash."""
 		notebook, original = self._get_notebook_and_node()
 		
@@ -409,7 +409,7 @@ class TrashNodeTestBase(unittest.TestCase):
 		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
 		
 		# Verify the node.
-		self.assertEquals(False, node.can_move(target)
+		self.assertEquals(False, node.can_move(target))
 		
 		with self.assertRaises(InvalidStructureError):
 			# Move the node.
