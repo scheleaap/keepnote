@@ -530,6 +530,48 @@ class ContentFolderNodeTestBase(object):
 		
 		self.assertEquals(False, node.is_node_a_child(other_node))
 	
+	def test_set_title_new(self):
+		# Create the node.
+		node = self._create_node(parent=None, loaded_from_storage=False)
+		self.assertNotEquals('new title', node.title)
+
+		# Set the title.
+		node.title = 'new title'
+		
+		# Verify the node.
+		self.assertEquals('new title', node.title)
+		self.assertEquals(True, node.is_dirty)
+		self.assertNotIn(NotebookNode.CHANGED_TITLE, node._unsaved_changes)
+	
+	def test_set_title_from_storage(self):
+		# Create the node.
+		node = self._create_node(parent=None, loaded_from_storage=True)
+		self.assertNotEquals('new title', node.title)
+
+		# Set the title.
+		node.title = 'new title'
+		
+		# Verify the node.
+		self.assertEquals('new title', node.title)
+		self.assertEquals(True, node.is_dirty)
+		self.assertIn(NotebookNode.CHANGED_TITLE, node._unsaved_changes)
+	
+	def test_set_title_if_deleted(self):
+		# Create the node and the parent.
+		parent = Mock(spec=NotebookNode)
+		parent.parent = None
+		node = self._create_node(parent=parent, loaded_from_storage=False)
+		parent.children = [node]
+
+		# Delete and set the title.
+		node.delete()
+		with self.assertRaises(IllegalOperationError):
+			node.title = 'new title'
+		
+		# Verify the node.
+		self.assertNotEquals('new title', node.title)
+		self.assertNotIn(NotebookNode.CHANGED_TITLE, node._unsaved_changes)
+	
 	def test_delete_without_children_new(self):
 		parent = Mock(spec=NotebookNode)
 		parent.parent = None
@@ -1065,6 +1107,26 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals([node], old_parent.children)
 		self.assertEquals([], new_parent.children)
 	
+	def test_save_set_title_from_storage(self):
+		# Create a mocked NotebookStorage.
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the node.
+		node = self._create_node(notebook_storage=notebook_storage, parent=None, loaded_from_storage=True)
+
+		# Make changes.
+		node.title = 'new title'
+		
+		# Save the node.
+		node.save()
+		
+		# Verify the storage.
+		notebook_storage.set_node_attributes.assert_called_once_with(node._notebook_storage_attributes)
+		
+		# Verify the node.
+		self.assertEquals(False, node.is_dirty)
+		self.assertNotIn(NotebookNode.CHANGED_TITLE, node._unsaved_changes)
+	
 	def test_save_delete_new(self):
 		"""Tests saving a deleted node."""
 		
@@ -1121,9 +1183,6 @@ class ContentFolderNodeTestBase(object):
 		node.is_dirty = True
 		node.save()
 		self.assertEquals(False, notebook_storage.remove_node.called)
-	
-
-
 	
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
@@ -1291,6 +1350,31 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 					additional_payload_names=None,
 					)
 	
+	def test_notebook_storage_attributes(self):
+		# Create the node and the parent.
+		parent = Mock(spec=NotebookNode)
+		parent.node_id = new_node_id()
+		node = ContentNode(
+				notebook_storage=None,
+				notebook=None,
+				node_id=DEFAULT_ID,
+				content_type=DEFAULT_CONTENT_TYPE,
+				parent=parent,
+				title=DEFAULT_TITLE,
+				loaded_from_storage=False,
+				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
+				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+				)
+		node.title = 'new title'
+		
+		# Verify the node.
+		expected = {
+				PARENT_ID_ATTRIBUTE: parent.node_id,
+				TITLE_ATTRIBUTE: 'new title',
+				MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
+				}
+		self.assertEquals(expected, node._notebook_storage_attributes)
+		
 	def test_add_additional_payload_new(self):
 		node = ContentNode(
 				notebook_storage=None,

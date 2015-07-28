@@ -195,6 +195,7 @@ class NotebookNode(object):
 	# Change constants
 	NEW = ChangeStateConstant('NEW')
 	DELETED = ChangeStateConstant('DELETED')
+	CHANGED_TITLE = ChangeStateConstant('CHANGED_TITLE')
 
 	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage):
 		"""Constructor.
@@ -215,7 +216,7 @@ class NotebookNode(object):
 		self.is_dirty = not loaded_from_storage
 		self.is_deleted = False
 		self.parent = parent
-		self.title = title
+		self._title = title
 		self._unsaved_changes = []
 		if not loaded_from_storage:
 			self._unsaved_changes.append(NotebookNode.NEW)
@@ -293,6 +294,20 @@ class NotebookNode(object):
 	def save(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
+	
+	@property
+	def title(self):
+		return self._title
+	
+	@title.setter
+	def title(self, title):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot set the title of a deleted node')
+		
+		self._title = title
+		self.is_dirty = True
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.append(NotebookNode.CHANGED_TITLE)
 
 
 class ContentNode(NotebookNode):
@@ -357,7 +372,7 @@ class ContentNode(NotebookNode):
 		self.additional_payload_names.append(payload_name)
 		self._payloads_to_store[payload_name] = payload_data
 		self.is_dirty = True
-		
+	
 	def can_add_new_content_child_node(self):
 		"""TODO"""
 		return not self.is_in_trash and not self.is_deleted
@@ -387,7 +402,7 @@ class ContentNode(NotebookNode):
 		copy = target.new_content_child_node(
 				node_id=new_node_id(),
 				content_type=self.content_type,
-				title=self.title,
+				title=self._title,
 				main_payload=(self.main_payload_name, self.get_payload(self.main_payload_name)),
 				additional_payloads=[(additional_payload_name, self.get_payload(additional_payload_name)) for additional_payload_name in self.additional_payload_names],
 				behind=behind
@@ -520,6 +535,17 @@ class ContentNode(NotebookNode):
 		
 		return child
 	
+	@property
+	def _notebook_storage_attributes(self):
+		"""TODO"""
+		attributes = {
+				TITLE_ATTRIBUTE: self._title,
+				MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
+				}
+		if self.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+		return attributes
+	
 	def remove_additional_payload(self, payload_name):
 		"""TODO"""
 		self.additional_payload_names.remove(payload_name)
@@ -533,16 +559,10 @@ class ContentNode(NotebookNode):
 #		if not self.is_dirty:
 #			return
 		if NotebookNode.NEW in self._unsaved_changes:
-			attributes = {
-					TITLE_ATTRIBUTE: self.title,
-					MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
-					}
-			if self.parent is not None:
-				attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
 			self._notebook_storage.add_node(
 					node_id=self.node_id,
 					content_type=self.content_type,
-					attributes=attributes,
+					attributes=self._notebook_storage_attributes,
 					payloads=[(payload_name, io.BytesIO(payload_data)) for (payload_name, payload_data) in self._payloads_to_store.iteritems()])
 			self.is_dirty = False
 			self._payloads_to_store.clear()
@@ -551,6 +571,10 @@ class ContentNode(NotebookNode):
 			self._notebook_storage.remove_node(self.node_id)
 			self.is_dirty = False
 			self._unsaved_changes.remove(NotebookNode.DELETED)
+		elif NotebookNode.CHANGED_TITLE in self._unsaved_changes:
+			self._notebook_storage.set_node_attributes(self._notebook_storage_attributes)
+			self.is_dirty = False
+			self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
 		else:
 			for payload_name, payload_data in self._payloads_to_store.items():
 				self._notebook_storage.add_node_payload(self.node_id, payload_name, io.BytesIO(payload_data))

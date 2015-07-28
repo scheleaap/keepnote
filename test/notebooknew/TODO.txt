@@ -75,8 +75,9 @@ x	test_move_to_different_notebook
 	test_save_with_dirty_parent
 	test_save_with_dirty_children
 	test node already exists with id for content/folder
-	test_set_title
-	test_set_title_if_deleted
+x	test_set_title
+x	test_set_title_if_deleted
+	test_save_set_title
 
 ContentNodeTest
 	test: "Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed."
@@ -103,6 +104,7 @@ x	test_save_delete_from_storage
 	test_save_root (omdat parent is None)
 	test_save_new_and_deleted
 x	test_save_twice_*
+	test_save_complex: parent (via move), title, additional_payload
 
 FolderTest
 	test_incorrect_content_type
