@@ -1136,6 +1136,7 @@ class ContentFolderNodeTestBase(object):
 		# Create the node and the parent.
 		parent = Mock(spec=NotebookNode)
 		parent.node_id = new_node_id()
+		parent.is_dirty = False
 		node = self._create_node(notebook_storage=notebook_storage, parent=parent, loaded_from_storage=False)
 		parent.children = [node]
 		
@@ -1161,6 +1162,7 @@ class ContentFolderNodeTestBase(object):
 		# Create the node and the parent.
 		parent = Mock(spec=NotebookNode)
 		parent.node_id = new_node_id()
+		parent.is_dirty = False
 		node = self._create_node(notebook_storage=notebook_storage, parent=parent, loaded_from_storage=True)
 		parent.children = [node]
 		
@@ -1184,6 +1186,35 @@ class ContentFolderNodeTestBase(object):
 		node.save()
 		self.assertEquals(False, notebook_storage.remove_node.called)
 	
+	def test_save_unsaved_dirty_deleted_children(self):
+		"""Tests saving a node with unsaved dirty deleted children."""
+		
+		# Create a mocked NotebookStorage.
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the node and the children.
+		child1 = Mock(spec=NotebookNode)
+		child1.is_dirty = True
+		child1.is_deleted = True
+		child2 = Mock(spec=NotebookNode)
+		child2.is_dirty = True
+		child2.is_deleted = True
+		node = self._create_node(notebook_storage=notebook_storage, parent=None, loaded_from_storage=False)
+		node.children = [child1, child2]
+		child1.parent = node
+		child2.parent = node
+		
+		with self.assertRaises(IllegalOperationError):
+			# Save the node.
+			node.save()
+		
+		# Verify the storage.
+		self.assertEquals(False, notebook_storage.add_node.called)
+		
+		# Verify the node.
+		self.assertEquals(True, node.is_dirty)
+
+
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
 			self,
@@ -1679,6 +1710,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		# Create the node and the parent.
 		parent = Mock(spec=NotebookNode)
 		parent.node_id = new_node_id()
+		parent.is_dirty = False
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,

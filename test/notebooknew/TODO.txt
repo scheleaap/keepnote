@@ -49,7 +49,6 @@ x	test_is_root
 x	test_is_in_trash
 x	test_delete_without_children
 x	test_delete_with_children
-x
 x	test_delete_if_root
 x	test_new_content_child_node
 -	test_new_content_child_node_no_main_payload
@@ -64,20 +63,21 @@ x	test_copy_to_node_in_trash
 -	test_copy_to_notebook
 x	test_copy_with_subtree
 x	test_copy_with_subtree_to_child
+	test_copy_if_deleted
 x	test_move
 x	test_move_after_sibling
 -	test_move_to_trash
 x	test_move_root
 x	test_move_to_child
 x	test_move_to_different_notebook
-	test_move_to_self
+	test_move_if_deleted
 	
 	test_save_with_dirty_parent
 	test_save_with_dirty_children
 	test node already exists with id for content/folder
 x	test_set_title
 x	test_set_title_if_deleted
-	test_save_set_title
+x	test_save_set_title
 
 ContentNodeTest
 	test: "Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed."

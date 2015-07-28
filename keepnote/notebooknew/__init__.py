@@ -558,6 +558,12 @@ class ContentNode(NotebookNode):
 	def save(self):
 #		if not self.is_dirty:
 #			return
+		if self.parent is not None and self.parent.is_dirty:
+			raise IllegalOperationError('Cannot save a node if the parent has changes')
+		for child in self.children:
+			if child.is_deleted and child.is_dirty:
+				raise IllegalOperationError('Cannot save a node if it has dirty deleted children')
+		
 		if NotebookNode.NEW in self._unsaved_changes:
 			self._notebook_storage.add_node(
 					node_id=self.node_id,
