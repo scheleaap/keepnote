@@ -326,7 +326,7 @@ class ContentNode(NotebookNode):
 	# Change constants
 	PAYLOAD_CHANGE = NotebookNode.StorageChange('PAYLOAD_CHANGE')
 	
-	# TODO: Use classmethods for loading from storage / for creating new in memory
+	# Idea: Use classmethods for loading from storage / for creating new in memory
 
 	def __init__(self, notebook_storage, notebook, content_type, parent, title, loaded_from_storage, 
 			main_payload=None, additional_payloads=None, node_id=None, main_payload_name=None, additional_payload_names=None):
@@ -571,12 +571,16 @@ class ContentNode(NotebookNode):
 	
 	def remove_additional_payload(self, payload_name):
 		"""TODO"""
-		self.additional_payload_names.remove(payload_name)
 		if payload_name in self._payloads_to_store:
+			self.additional_payload_names.remove(payload_name)
 			del self._payloads_to_store[payload_name]
-		else:
+		elif payload_name == self.main_payload_name or payload_name in self.additional_payload_names:
+			self.additional_payload_names.remove(payload_name)
 			self._payload_names_to_remove.append(payload_name)
-			self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
+			if ContentNode.PAYLOAD_CHANGE not in self._unsaved_changes:
+				self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
+		else:
+			raise PayloadDoesNotExistError(payload_name)
 	
 	def save(self):
 #		if not self.is_dirty:
@@ -598,17 +602,21 @@ class ContentNode(NotebookNode):
 		elif NotebookNode.DELETED in self._unsaved_changes:
 			self._notebook_storage.remove_node(self.node_id)
 			self._unsaved_changes.remove(NotebookNode.DELETED)
-		elif NotebookNode.CHANGED_TITLE in self._unsaved_changes:
-			self._notebook_storage.set_node_attributes(self._notebook_storage_attributes)
-			self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
-		elif ContentNode.PAYLOAD_CHANGE in self._unsaved_changes:
-			for payload_name, payload_data in self._payloads_to_store.items():
-				self._notebook_storage.add_node_payload(self.node_id, payload_name, io.BytesIO(payload_data))
-				del self._payloads_to_store[payload_name]
-			for payload_name in list(self._payload_names_to_remove):
-				self._notebook_storage.remove_node_payload(self.node_id, payload_name)
-				self._payload_names_to_remove.remove(payload_name)
-			self._unsaved_changes.remove(ContentNode.PAYLOAD_CHANGE)
+		else:
+			if NotebookNode.CHANGED_TITLE in self._unsaved_changes or NotebookNode.MOVED in self._unsaved_changes:
+				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
+				if NotebookNode.CHANGED_TITLE in self._unsaved_changes:
+					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
+				if NotebookNode.MOVED in self._unsaved_changes:
+					self._unsaved_changes.remove(NotebookNode.MOVED)
+			if ContentNode.PAYLOAD_CHANGE in self._unsaved_changes:
+				for payload_name in list(self._payload_names_to_remove):
+					self._notebook_storage.remove_node_payload(self.node_id, payload_name)
+					self._payload_names_to_remove.remove(payload_name)
+				for payload_name, payload_data in self._payloads_to_store.items():
+					self._notebook_storage.add_node_payload(self.node_id, payload_name, io.BytesIO(payload_data))
+					del self._payloads_to_store[payload_name]
+				self._unsaved_changes.remove(ContentNode.PAYLOAD_CHANGE)
 	
 	def set_main_payload(self, payload_data):
 		"""TODO"""

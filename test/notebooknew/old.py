@@ -37,191 +37,10 @@ CHILD121_SN = StoredNode('child121_id', CONTENT_TYPE_HTML, attributes={PARENT_ID
 CHILD2_SN = StoredNode('child2_id', CONTENT_TYPE_HTML, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child2'}, payload_names=[])
 CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_HTML, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payload_names=[])
 
-#class NotebookTest(unittest.TestCase):
-class NotebookTest(object):
-	def test_save_order(self):
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN]
-		
-		# Add nodes first.
-		notebook = Notebook(notebook_storage)
-		child1 = notebook.root.new_content_child_node(node_id=CHILD1_NN.node_id, content_type=CHILD1_NN.content_type, title=CHILD1_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		child11 = child1.new_content_child_node(node_id=CHILD11_NN.node_id, content_type=CHILD11_NN.content_type, title=CHILD11_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		child12 = child1.new_content_child_node(node_id=CHILD12_NN.node_id, content_type=CHILD12_NN.content_type, title=CHILD12_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		child121 = child12.new_content_child_node(node_id=CHILD121_NN.node_id, content_type=CHILD121_NN.content_type, title=CHILD121_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		child2 = notebook.root.new_content_child_node(node_id=CHILD2_NN.node_id, content_type=CHILD2_NN.content_type, title=CHILD2_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		child21 = child2.new_content_child_node(node_id=CHILD21_NN.node_id, content_type=CHILD21_NN.content_type, title=CHILD21_NN.title, main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD), additional_payloads=[])
-		
-		# Verify the notebook.
-		self.assertEquals(True, notebook.is_dirty)
-		
-		# Verify that no nodes were stored yet.
-		self.assertFalse(notebook_storage.add_node.called)
-		
-		# Save the notebook.
-		notebook.save()
-		
-		# Verify that the nodes were stored in the proper order.
-		self.assertEquals(6, notebook_storage.add_node.call_count)
-		# TODO: HIER BEZIG:
-		# - de node IDs extraheren, om zo de volgorde te controleren:
-		#   121 voor 12
-		#   12 voor 1
-		#   11 voor 1
-		#   21 voor 2
-		#notebook_storage.add_node.call_list_args
-		#
-		#notebook_storage.add_node.assert_any_call(
-		#		node_id=DEFAULT_ID, content_type=ANY, attributes=ANY, payloads=ANY])
-		self.assertEquals(True, False)
-		
-		# Verify the notebook.
-		self.assertEquals(False, notebook.is_dirty)
-	
-
 # TODO: HIER BEZIG:
 #	aan alle tests ook TRASH toevoegen
 #	CHILD2 naar TRASH hernoemen en CHILD21 naar TRASH_CHILD1?
 #	notebook_storage.get_all_nodes.return_value = [ROOT_SN, TRASH_SN, TRASH_CHILD_SN]
-
-class RootContentFolderNodeTestBase(object):
-	def _get_notebook_and_node(self):
-		raise NotImplementedError()
-	
-	def test_copy_to_notebook_and_save(self):
-		"""Test copying a node to another notebook."""
-		notebook1, original = self._get_notebook_and_node()
-		notebook2, target = self._get_notebook_and_node()
-		
-		# Make sure that the node to be copied has a child node.
-		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Verify the target notebook and the original.
-		self.assertEquals(False, notebook2.is_dirty)
-		self.assertEquals(True, original.can_copy(target))
-		
-		# Copy the node.
-		copy = original.copy(target)
-		
-		# Verify the target notebook, the parent and the copy.
-		self.assertEquals(True, notebook2.is_dirty)
-		self.assertEquals([copy], target.children)
-		self.assertNotEquals(original.node_id, copy.node_id)
-		self.assert_nodes_equal(original, copy, ignore=['node_id', 'is_dirty'])
-		self.assertEquals(True, node.is_dirty)
-		
-		# Verify that the node was not stored yet.
-		self.assertFalse(notebook_storage.add_node.called)
-		
-		# Save the target notebook.
-		notebook2.save()
-		
-		# Verify that the node was stored.
-		self.assertEquals(1, notebook_storage.add_node.call_count)
-		notebook_storage.add_node.assert_any_call(node_id=copy.node_id, content_type=ANY, attributes=ANY, payloads=ANY) # TODO: ANY
-		
-		# Verify the notebook and the node.
-		self.assertEquals(False, notebook2.is_dirty)
-		self.assertEquals(False, node.is_dirty)
-	
-class ContentFolderNodeTestBase(RootContentFolderNodeTestBase):
-	def test_delete_and_save(self):
-		"""Tests deleting a node."""
-		notebook, node = self._get_notebook_and_node()
-		parent = node.parent
-		
-		# Verify the notebook and the node.
-		self.assertEquals(False, notebook.is_dirty)
-		self.assertEquals(True, node.can_delete())
-		
-
-		# Delete the node.
-		node.delete()
-		
-		# Verify the notebook, the parent and the copy.
-		self.assertEquals(True, notebook.is_dirty)
-		self.assertEquals([], parent.children)
-		self.assertEquals(None, node.parent)
-		
-		# Verify that the node was not deleted from storage yet.
-		self.assertFalse(notebook_storage.delete_node.called)
-		
-		# Save the notebook.
-		notebook.save()
-		
-		# Verify that the node was deleted.
-		self.assertEquals(1, notebook_storage.delete_node.call_count)
-		notebook_storage.delete_node.assert_any_call(node_id=node.node_id)
-		
-		# Verify the notebook and the node.
-		self.assertEquals(False, notebook.is_dirty)
-	
-
-class RootNodeTestBase(unittest.TestCase):
-	def _get_notebook_and_node(self):
-		# Initialize a NotebookStorage.
-		notebook_storage = InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		return (notebook, notebook.root)
-	
-	def test_delete(self):
-		"""Test deleting the root."""
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, TRASH_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		self.assertEquals(False, notebook.root.can_delete())
-		
-		with self.assertRaises(InvalidStructureError):
-			# Delete the node.
-			node = notebook.root.delete()
-	
-	def test_copy_subtree(self):
-		"""Tests copying the root and its children, including the trash."""
-		notebook, root = self._get_notebook_and_node()
-		
-		# Create a folder child node and create a target node.
-		root_trash_child = root.children[0]
-		root_folder_child = root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Copy the node.
-		copy = root.copy(target, with_subtree=True)
-		
-		# Verify the copy's children.
-		copy_trash_child = copy.children[0]
-		self.assert_nodes_equal(root_trash_child, copy_trash_child, ignore=['node_id', 'content_type', 'is_dirty'])
-		self.assertNotEquals(root_trash_child.node_id, copy_trash_child.node_id)
-		self.assertEqual(CONTENT_TYPE_FOLDER, copy_trash_child.content_type)
-		self.assertEquals(True, copy_trash_child.is_dirty)
-		
-		copy_folder_child = copy.children[1]
-		self.assert_nodes_equal(root_folder_child, copy_folder_child, ignore=['node_id', 'is_dirty'])
-		self.assertNotEquals(root_folder_child.node_id, copy_folder_child.node_id)
-		self.assertEquals(True, root_folder_child.is_dirty)
-	
-	def test_move(self):
-		"""Tests moving the root."""
-		notebook, node = self._get_notebook_and_node()
-		
-		# Create a target node.
-		target = notebook.root.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		
-		# Verify the node.
-		self.assertEquals(False, node.can_move(target))
-		
-		with self.assertRaises(InvalidStructureError):
-			# Move the node.
-			node.move(target)
 
 class TrashNodeTestBase(unittest.TestCase):
 	def test_new_content_child_node(self):
@@ -416,26 +235,6 @@ class TrashNodeTestBase(unittest.TestCase):
 			node.move(target)
 
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
-	def _get_notebook_and_node(self):
-		# Initialize a NotebookStorage.
-		notebook_storage = InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)), (DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		return (notebook, notebook.root.children[0])
-	
 	def test_equals(self):
 		def create_node(
 				self,
@@ -490,25 +289,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def test_get_payload_nonexistent(self)
 
 class FolderNodeTest(unittest.TestCase, ContentAndFolderNodeTestBase):
-	def _get_notebook_and_node(self):
-		# Initialize a NotebookStorage.
-		notebook_storage = InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_FOLDER,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						},
-				payloads=[]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		return (notebook, notebook.root.children[0])
-	
 	def test_equals(self):
 		def create_node(
 				self,
