@@ -63,18 +63,18 @@ x	test_copy_to_node_in_trash
 -	test_copy_to_notebook
 x	test_copy_with_subtree
 x	test_copy_with_subtree_to_child
-	test_copy_if_deleted
+x	test_copy_if_deleted
 x	test_move
 x	test_move_after_sibling
 -	test_move_to_trash
 x	test_move_root
 x	test_move_to_child
 x	test_move_to_different_notebook
-	test_move_if_deleted
-	
-	test_save_with_dirty_parent
-	test_save_with_dirty_children
+x	test_move_if_deleted
+x	test_save_with_dirty_parent
+x	test_save_with_unsaved_dirty_deleted_children
 	test node already exists with id for content/folder
+	test_*_with_duplicate/existing_id
 x	test_set_title
 x	test_set_title_if_deleted
 x	test_save_set_title

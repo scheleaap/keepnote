@@ -328,7 +328,9 @@ class ContentNode(NotebookNode):
 	
 	# TODO: Use classmethods for loading from storage / for creating new in memory
 
-	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage=None, main_payload=None, additional_payloads=None, main_payload_name=None, additional_payload_names=None, is_dirty=None):
+	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage=None, 
+			main_payload=None, additional_payloads=None, main_payload_name=None, additional_payload_names=None,
+			is_dirty=None):
 		"""Constructor.
 		
 		Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed.
@@ -391,7 +393,9 @@ class ContentNode(NotebookNode):
 		return not self.is_in_trash and not self.is_deleted
 	
 	def can_copy(self, target, with_subtree):
-		if target.is_trash or target.is_in_trash:
+		if self.is_deleted:
+			return False
+		elif target.is_trash or target.is_in_trash:
 			return False
 		elif with_subtree and self.is_node_a_child(target):
 			return False
@@ -399,11 +403,17 @@ class ContentNode(NotebookNode):
 			return True
 	
 	def can_move(self, target):
-		return self._notebook == target._notebook and not self.is_root and not self.is_node_a_child(target)
+		return \
+				not self.is_deleted and \
+				self._notebook == target._notebook and \
+				not self.is_root and \
+				not self.is_node_a_child(target)
 	
 	def copy(self, target, with_subtree, behind=None):
 		"""TODO"""
-		if target.is_trash or target.is_in_trash:
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot copy a deleted node')
+		elif target.is_trash or target.is_in_trash:
 			raise IllegalOperationError('Cannot copy a node to the trash')
 		elif with_subtree and self.is_node_a_child(target):
 			raise IllegalOperationError('Cannot copy a node with its children to a child')
@@ -472,9 +482,11 @@ class ContentNode(NotebookNode):
 		return False
 	
 	def move(self, target, behind=None):
-		if self._notebook != target._notebook:
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot move a deleted node')
+		elif self._notebook != target._notebook:
 			raise IllegalOperationError('Cannot move a note to a node in another notebook')
-		if self.is_root:
+		elif self.is_root:
 			raise IllegalOperationError('Cannot move the root node')
 		elif self.is_node_a_child(target):
 			raise IllegalOperationError('Cannot move a node to one of its children')

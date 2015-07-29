@@ -900,6 +900,7 @@ class ContentFolderNodeTestBase(object):
 		original = self._create_node(parent=None, loaded_from_storage=True)
 		target = Mock(spec=NotebookNode)
 		target.is_trash = True
+		target.is_in_trash = False
 		
 		# Verify the original.
 		self.assertEquals(False, original.can_copy(target, with_subtree=False))
@@ -907,11 +908,15 @@ class ContentFolderNodeTestBase(object):
 		with self.assertRaises(IllegalOperationError):
 			# Copy the node.
 			original.copy(target, with_subtree=False)
+		
+		# Verify the target.
+		self.assertEquals(False, self._get_proper_copy_method(target).called)
 	
 	def test_copy_to_trash_2(self):
 		# Create the original and target nodes.
 		original = self._create_node(parent=None, loaded_from_storage=True)
 		target = Mock(spec=NotebookNode)
+		target.is_trash = False
 		target.is_in_trash = True
 		
 		# Verify the original.
@@ -920,6 +925,32 @@ class ContentFolderNodeTestBase(object):
 		with self.assertRaises(IllegalOperationError):
 			# Copy the node.
 			original.copy(target, with_subtree=False)
+		
+		# Verify the target.
+		self.assertEquals(False, self._get_proper_copy_method(target).called)
+	
+	def test_copy_if_deleted(self):
+		# Create the original, parent and target nodes.
+		parent = Mock(spec=NotebookNode)
+#		parent.parent = None
+		original = self._create_node(parent=parent, loaded_from_storage=True)
+		parent.children = [original]
+		target = Mock(spec=NotebookNode)
+		target.is_trash = False
+		target.is_in_trash = False
+		
+		# Delete the original.
+		original.delete()
+		
+		# Verify the original.
+		self.assertEquals(False, original.can_copy(target, with_subtree=False))
+		
+		with self.assertRaises(IllegalOperationError):
+			# Copy the node.
+			original.copy(target, with_subtree=False)
+		
+		# Verify the target.
+		self.assertEquals(False, self._get_proper_copy_method(target).called)
 	
 	def test_copy_with_subtree(self):
 		"""Tests copying a node and its children."""
@@ -1030,6 +1061,31 @@ class ContentFolderNodeTestBase(object):
 		# Verify the node and the parents.
 		self.assertEquals(False, node.is_dirty)
 		self.assertEquals([node], old_parent.children)
+		self.assertEquals([], new_parent.children)
+	
+	def test_move_if_deleted(self):
+		"""Tests moving a node if it is deleted."""
+		
+		# Create the node and parents.
+		old_parent = Mock(spec=NotebookNode)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		old_parent.children = [node]
+		new_parent = Mock(spec=NotebookNode)
+		new_parent._notebook = None
+		new_parent.parent = None
+		new_parent.children = []
+		
+		# Delete the node.
+		node.delete()
+		
+		# Verify the node.
+		self.assertEquals(False, node.can_move(new_parent))
+		
+		with self.assertRaises(IllegalOperationError):
+			# Move the node.
+			node.move(new_parent)
+		
+		# Verify the parent.
 		self.assertEquals([], new_parent.children)
 	
 	def test_move_root(self):
@@ -1185,7 +1241,28 @@ class ContentFolderNodeTestBase(object):
 		node.save()
 		self.assertEquals(False, notebook_storage.remove_node.called)
 	
-	def test_save_unsaved_dirty_deleted_children(self):
+	def test_save_new_with_dirty_parent(self):
+		"""Tests saving a new node with a dirty parent."""
+		
+		# Create a mocked NotebookStorage.
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		
+		# Create the node and the parent.
+		parent = Mock(spec=NotebookNode)
+		parent.is_dirty = True
+		node = self._create_node(notebook_storage=notebook_storage, parent=parent, loaded_from_storage=False)
+		
+		with self.assertRaises(IllegalOperationError):
+			# Save the node.
+			node.save()
+		
+		# Verify the storage.
+		self.assertEquals(False, notebook_storage.add_node.called)
+		
+		# Verify the node.
+		self.assertEquals(True, node.is_dirty)
+	
+	def test_save_with_unsaved_dirty_deleted_children(self):
 		"""Tests saving a node with unsaved dirty deleted children."""
 		
 		# Create a mocked NotebookStorage.
