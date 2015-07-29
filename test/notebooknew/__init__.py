@@ -659,7 +659,6 @@ class ContentFolderNodeTestBase(object):
 		
 		# Add content node.
 		child = node.new_content_child_node(
-				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_HTML,
 				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -670,7 +669,7 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals([child], node.children)
 		
 		# Verify the child.
-		self.assertEquals(DEFAULT_ID, child.node_id)
+		self.assertEquals(AnyUuidMatcher(), child.node_id)
 		self.assertEquals(CONTENT_TYPE_HTML, child.content_type)
 		self.assertEquals(node, child.parent)
 		self.assertEquals(DEFAULT_TITLE, child.title)
@@ -690,7 +689,6 @@ class ContentFolderNodeTestBase(object):
 		
 		with self.assertRaises(IllegalOperationError):
 			node.new_content_child_node(
-					node_id=DEFAULT_ID,
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -707,7 +705,6 @@ class ContentFolderNodeTestBase(object):
 		
 		with self.assertRaises(IllegalOperationError):
 			node.new_content_child_node(
-					node_id=DEFAULT_ID,
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -726,7 +723,6 @@ class ContentFolderNodeTestBase(object):
 		
 		with self.assertRaises(IllegalOperationError):
 			node.new_content_child_node(
-					node_id=DEFAULT_ID,
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -736,12 +732,11 @@ class ContentFolderNodeTestBase(object):
 	def test_new_content_child_node_behind_sibling(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
 		
-		child1 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		child2 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1 = node.new_folder_child_node(title=DEFAULT_TITLE)
+		child2 = node.new_folder_child_node(title=DEFAULT_TITLE)
 		
 		# Add content node.
 		child3 = node.new_content_child_node(
-				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_HTML,
 				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -758,7 +753,6 @@ class ContentFolderNodeTestBase(object):
 		with self.assertRaises(IllegalOperationError):
 			# Add content node.
 			node.new_content_child_node(
-					node_id=DEFAULT_ID,
 					content_type=CONTENT_TYPE_HTML,
 					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -772,16 +766,13 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals(True, node.can_add_new_folder_child_node())
 		
 		# Add folder node.
-		child = node.new_folder_child_node(
-				node_id=DEFAULT_ID,
-				title=DEFAULT_TITLE,
-				)
+		child = node.new_folder_child_node(title=DEFAULT_TITLE)
 		
 		# Verify the parent.
 		self.assertEquals([child], node.children)
 		
 		# Verify the child.
-		self.assertEquals(DEFAULT_ID, child.node_id)
+		self.assertEquals(AnyUuidMatcher(), child.node_id)
 		self.assertEquals(CONTENT_TYPE_FOLDER, child.content_type)
 		self.assertEquals(node, child.parent)
 		self.assertEquals(DEFAULT_TITLE, child.title)
@@ -796,10 +787,7 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals(False, node.can_add_new_folder_child_node())
 		
 		with self.assertRaises(IllegalOperationError):
-			node.new_folder_child_node(
-					node_id=DEFAULT_ID,
-					title=DEFAULT_TITLE,
-					)
+			node.new_folder_child_node(title=DEFAULT_TITLE)
 	
 	def test_new_folder_child_node_in_trash_2(self):
 		parent = Mock(spec=NotebookNode)
@@ -810,10 +798,7 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals(False, node.can_add_new_folder_child_node())
 		
 		with self.assertRaises(IllegalOperationError):
-			node.new_folder_child_node(
-					node_id=DEFAULT_ID,
-					title=DEFAULT_TITLE,
-					)
+			node.new_folder_child_node(title=DEFAULT_TITLE)
 	
 	def test_new_folder_child_node_if_deleted(self):
 		parent = Mock(spec=NotebookNode)
@@ -826,23 +811,16 @@ class ContentFolderNodeTestBase(object):
 		self.assertEquals(False, node.can_add_new_folder_child_node())
 		
 		with self.assertRaises(IllegalOperationError):
-			node.new_folder_child_node(
-					node_id=DEFAULT_ID,
-					title=DEFAULT_TITLE,
-					)
+			node.new_folder_child_node(title=DEFAULT_TITLE)
 	
 	def test_new_folder_child_node_behind_sibling(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
 		
-		child1 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
-		child2 = node.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1 = node.new_folder_child_node(title=DEFAULT_TITLE)
+		child2 = node.new_folder_child_node(title=DEFAULT_TITLE)
 		
 		# Add folder node.
-		child3 = node.new_folder_child_node(
-				node_id=DEFAULT_ID,
-				title=DEFAULT_TITLE,
-				behind=child1,
-				)
+		child3 = node.new_folder_child_node(title=DEFAULT_TITLE, behind=child1)
 		
 		# Verify the parent.
 		self.assertEquals([child1, child3, child2], node.children)
@@ -852,11 +830,7 @@ class ContentFolderNodeTestBase(object):
 		
 		with self.assertRaises(IllegalOperationError):
 			# Add folder node.
-			node.new_folder_child_node(
-					node_id=DEFAULT_ID,
-					title=DEFAULT_TITLE,
-					behind=object(),
-					)
+			node.new_folder_child_node(title=DEFAULT_TITLE, behind=object())
 	
 	def test_copy_behind_sibling(self):
 		# Create the original and target nodes.
@@ -879,7 +853,7 @@ class ContentFolderNodeTestBase(object):
 		
 		# Create the original and target nodes. The original has two child nodes.
 		original = self._create_node(parent=None, loaded_from_storage=False)
-		child1 = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1 = original.new_folder_child_node(title=DEFAULT_TITLE)
 		child1.parent = original
 		child11 = Mock(spec=NotebookNode)
 		child11.parent = child1
@@ -981,7 +955,7 @@ class ContentFolderNodeTestBase(object):
 		
 		# Create the original and target nodes. The original has two child nodes.
 		original = self._create_node(parent=None, loaded_from_storage=True)
-		child1 = original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		child1 = original.new_folder_child_node(title=DEFAULT_TITLE)
 		child1.parent = original
 		child11 = Mock(spec=NotebookNode)
 		child11.parent = child1
@@ -1300,30 +1274,31 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			loaded_from_storage=False
 			):
 		
-		node_id = new_node_id()
 		content_type = DEFAULT_CONTENT_TYPE
 		title = DEFAULT_TITLE
 		if loaded_from_storage:
 			main_payload = None
 			additional_payloads = None
+			node_id = new_node_id()
 			main_payload_name = DEFAULT_HTML_PAYLOAD_NAME
 			additional_payload_names = [DEFAULT_PNG_PAYLOAD_NAME]
 		else:
 			main_payload = (DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD)
 			additional_payloads = [(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)]
+			node_id = None
 			main_payload_name = None
 			additional_payload_names = None
 		
 		return ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				node_id=node_id,
 				content_type=content_type,
 				parent=parent,
 				title=title,
 				loaded_from_storage=loaded_from_storage,
 				main_payload=main_payload,
 				additional_payloads=additional_payloads,
+				node_id=node_id,
 				main_payload_name=main_payload_name,
 				additional_payload_names=additional_payload_names
 				)
@@ -1348,7 +1323,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
 				title=DEFAULT_TITLE,
@@ -1357,7 +1331,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
 		
-		self.assertEquals(DEFAULT_ID, node.node_id)
+		self.assertEquals(AnyUuidMatcher(), node.node_id)
 		self.assertEquals(DEFAULT_CONTENT_TYPE, node.content_type)
 		self.assertEquals(parent, node.parent)
 		self.assertEquals(DEFAULT_TITLE, node.title)
@@ -1398,14 +1372,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
-					node_id=DEFAULT_ID,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
 					title=DEFAULT_TITLE,
 					loaded_from_storage=False,
-					main_payload=None,
-					main_payload_name=None,
+					main_payload=(DEFAULT_HTML_PAYLOAD_NAME,DEFAULT_HTML_PAYLOAD),
 					additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+					node_id='12345',
+					main_payload_name=None,
 					additional_payload_names=None,
 					)
 	
@@ -1414,14 +1388,30 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
-					node_id=DEFAULT_ID,
+					content_type=DEFAULT_CONTENT_TYPE,
+					parent=None,
+					title=DEFAULT_TITLE,
+					loaded_from_storage=False,
+					main_payload=None,
+					additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
+					node_id=None,
+					main_payload_name=None,
+					additional_payload_names=None,
+					)
+	
+	def test_constructor_parameters_new_3(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			ContentNode(
+					notebook_storage=None,
+					notebook=None,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
 					title=DEFAULT_TITLE,
 					loaded_from_storage=False,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-					main_payload_name=None,
 					additional_payloads=None,
+					node_id=None,
+					main_payload_name=None,
 					additional_payload_names=None,
 					)
 	
@@ -1430,14 +1420,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
-					node_id=DEFAULT_ID,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
 					title=DEFAULT_TITLE,
 					loaded_from_storage=True,
 					main_payload=None,
-					main_payload_name=None,
 					additional_payloads=None,
+					node_id=None,
+					main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 					additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 					)
 	
@@ -1446,17 +1436,32 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
-					node_id=DEFAULT_ID,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
 					title=DEFAULT_TITLE,
 					loaded_from_storage=True,
 					main_payload=None,
-					main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 					additional_payloads=None,
-					additional_payload_names=None,
+					node_id=DEFAULT_ID,
+					main_payload_name=None,
+					additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 					)
 	
+	def test_constructor_parameters_from_storage_3(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			ContentNode(
+					notebook_storage=None,
+					notebook=None,
+					content_type=DEFAULT_CONTENT_TYPE,
+					parent=None,
+					title=DEFAULT_TITLE,
+					loaded_from_storage=True,
+					main_payload=None,
+					additional_payloads=None,
+					node_id=DEFAULT_ID,
+					main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
+					additional_payload_names=None,
+					)	
 	def test_notebook_storage_attributes(self):
 		# Create the node and the parent.
 		parent = Mock(spec=NotebookNode)
@@ -1464,7 +1469,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
 				title=DEFAULT_TITLE,
@@ -1486,7 +1490,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1580,11 +1583,10 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		with self.assertRaises(PayloadDoesNotExistError):
 			node.get_payload('unknown_name')
 	
-	def test_remove_additional_payload_new_node(self):
+	def test_remove_additional_payload_new(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1632,11 +1634,10 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		with self.assertRaises(PayloadDoesNotExistError):
 			node.get_payload(DEFAULT_PNG_PAYLOAD_NAME)
 	
-	def test_set_main_payload_new_node(self):
+	def test_set_main_payload_new(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1689,7 +1690,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		original = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -1697,7 +1697,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
-		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		original.new_folder_child_node(title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
 		target.parent = None
 		target.is_trash = False
@@ -1734,7 +1734,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
-		original.new_folder_child_node(node_id=new_node_id(), title=DEFAULT_TITLE)
+		original.new_folder_child_node(title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
 		target.parent = None
 		target.is_trash = False
@@ -1799,7 +1799,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
 				title=DEFAULT_TITLE,
@@ -1813,7 +1812,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 		# Verify the storage.
 		notebook_storage.add_node.assert_called_once_with(
-				node_id=DEFAULT_ID,
+				node_id=node.node_id,
 				content_type=DEFAULT_CONTENT_TYPE,
 				attributes={
 						PARENT_ID_ATTRIBUTE: parent.node_id,
@@ -1874,7 +1873,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		self.assertEquals(False, notebook_storage.add_node_payload.called)
 		self.assertEquals(False, notebook_storage.remove_node_payload.called)
 	
-	def test_save_remove_additional_payload_new_node(self):
+	def test_save_remove_additional_payload_new(self):
 		# Create a mocked NotebookStorage.
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		
@@ -1882,7 +1881,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
 				title=DEFAULT_TITLE,
@@ -2036,8 +2034,13 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 
 class AnyUuidMatcher(object):
 	def __eq__(self, other):
+		if other is None:
+			return False
 		matcher = re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', other)
 		return matcher is not None
+	
+	def __repr__(self, *args, **kwargs):
+		return '{cls}[]'.format(cls=self.__class__.__name__, **self.__dict__)
 
 class AllButOneUuidMatcher(AnyUuidMatcher):
 	def __init__(self, uuid):

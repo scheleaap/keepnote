@@ -64,6 +64,8 @@ class StoredNode(object):
 
 class NotebookStorage:
 	"""Classes implementing this interface can store notebooks.
+	
+	All nodes within a NotebookStorage have a unique identifier.
 	"""
 	
 	def add_node(self, node_id, content_type, attributes, payloads):

@@ -199,27 +199,29 @@ class NotebookNode(object):
 	CHANGED_TITLE = StorageChange('CHANGED_TITLE')
 	MOVED = StorageChange('MOVED')
 
-	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage):
+	def __init__(self, notebook_storage, notebook, content_type, parent, title, loaded_from_storage, node_id):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
-		@param node_id: The id of the new node.
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		"""
 		self._notebook_storage = notebook_storage
 		self._notebook = notebook
-		self.node_id = node_id
 		self.children = []
 		self.content_type = content_type
 		self.is_deleted = False
 		self.parent = parent
 		self._title = title
 		self._unsaved_changes = []
-		if not loaded_from_storage:
+		if loaded_from_storage:
+			self.node_id = node_id
+		else:
+			self.node_id = new_node_id()
 			self._unsaved_changes.append(NotebookNode.NEW)
 	
 	def can_add_new_content_child_node(self):
@@ -274,10 +276,9 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, behind=None):
+	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
 		"""Adds a new child node.
 		
-		@param node_id: The id of the new node. Must be unique within the notebook.
 		@param content_type: The content type of the node.
 		@param title: The title of the node.
 		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
@@ -287,10 +288,9 @@ class NotebookNode(object):
 		"""
 		raise NotImplementedError('TODO')
 	
-	def new_folder_child_node(self, node_id, title, behind=None):
+	def new_folder_child_node(self, title, behind=None):
 		"""Adds a new child node.
 		
-		@param node_id: The id of the new node. Must be unique within the notebook.
 		@param title: The title of the node.
 		@param behind: TODO
 #		@raise NodeAlreadyExists: If a node with the same id already exists within the notebook.
@@ -328,48 +328,49 @@ class ContentNode(NotebookNode):
 	
 	# TODO: Use classmethods for loading from storage / for creating new in memory
 
-	def __init__(self, notebook_storage, notebook, node_id, content_type, parent, title, loaded_from_storage=None, 
-			main_payload=None, additional_payloads=None, main_payload_name=None, additional_payload_names=None,
-			is_dirty=None):
+	def __init__(self, notebook_storage, notebook, content_type, parent, title, loaded_from_storage, 
+			main_payload=None, additional_payloads=None, node_id=None, main_payload_name=None, additional_payload_names=None):
 		"""Constructor.
 		
 		Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
-		@param node_id: The id of the new node.
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param loaded_from_storage: TODO
-		@param main_payload: A tuple consisting of the main paylad name and the main payload data.
-		@param additional_payloads: A list containing tuples consisting of paylad names and payload data.
-		@param main_payload_name: The name of the main payload.
-		@param additional_payload_names: The names of the additional payloads.
+		@param main_payload: A tuple consisting of the main paylad name and the main payload data. Only if loaded_from_storage == False.
+		@param additional_payloads: A list containing tuples consisting of paylad names and payload data. Only if loaded_from_storage == False.
+		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param main_payload_name: The name of the main payload. Only if loaded_from_storage == True.
+		@param additional_payload_names: The names of the additional payloads. Only if loaded_from_storage == True.
 		@param is_dirty: Indicates whether the node has changed since it was last saved.
 		"""
 		super(ContentNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				node_id=node_id,
 				content_type=content_type,
 				parent=parent,
 				title=title,
 				loaded_from_storage=loaded_from_storage,
+				node_id=node_id,
 				)
-		if loaded_from_storage and (main_payload_name is None or additional_payload_names is None):
-			raise IllegalArgumentCombinationError()
-		elif not loaded_from_storage and (main_payload is None or additional_payloads is None):
-			raise IllegalArgumentCombinationError()
-		
-		if main_payload_name is not None:
+		if loaded_from_storage:
+			if node_id is None or main_payload_name is None or additional_payload_names is None:
+				raise IllegalArgumentCombinationError()
+				
 			self.main_payload_name = main_payload_name
 			self.additional_payload_names = additional_payload_names
 			self._payloads_to_store = OrderedDict()
 		else:
+			if node_id is not None or main_payload is None or additional_payloads is None:
+				raise IllegalArgumentCombinationError()
+			
 			self.main_payload_name = main_payload[0]
 			self.additional_payload_names = [additional_payload[0] for additional_payload in additional_payloads]
 			self._payloads_to_store = OrderedDict([main_payload] + additional_payloads)
+		
 		self._payload_names_to_remove = []
 	
 	def add_additional_payload(self, payload_name, payload_data):
@@ -503,7 +504,7 @@ class ContentNode(NotebookNode):
 		self.parent = target
 		self._unsaved_changes.append(NotebookNode.MOVED)
 	
-	def new_content_child_node(self, node_id, content_type, title, main_payload, additional_payloads, behind=None):
+	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
 #		if additional_payloads is None:
 #			additional_payloads = []
 		
@@ -515,7 +516,6 @@ class ContentNode(NotebookNode):
 		child = ContentNode(
 				notebook_storage=self._notebook_storage,
 				notebook=self._notebook,
-				node_id=node_id,
 				content_type=content_type,
 				parent=self,
 				title=title,
@@ -534,7 +534,7 @@ class ContentNode(NotebookNode):
 	
 		return child
 	
-	def new_folder_child_node(self, node_id, title, behind=None):
+	def new_folder_child_node(self, title, behind=None):
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
 		elif self.is_deleted:
@@ -543,7 +543,6 @@ class ContentNode(NotebookNode):
 		child = FolderNode(
 				notebook_storage=self._notebook_storage,
 				notebook=self._notebook,
-				node_id=node_id,
 				parent=self,
 				title=title,
 				loaded_from_storage=False
@@ -631,15 +630,15 @@ class FolderNode(NotebookNode):
 	"""A folder node in a notebook. A folder node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, node_id, parent, title, loaded_from_storage):
+	def __init__(self, notebook_storage, notebook, parent, title, loaded_from_storage, node_id=None):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
-		@param node_id: The id of the new node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param node_id: The id of the node. Only if loaded_from_storage == True.
 		"""
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
@@ -666,15 +665,15 @@ class TrashNode(FolderNode):
 	"""A trash node in a notebook. A trash node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, node_id, parent, title, loaded_from_storage):
+	def __init__(self, notebook_storage, notebook, parent, title, loaded_from_storage, node_id=None):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
-		@param node_id: The id of the new node.
 		@param parent: The parent of the node or None.
 		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param node_id: The id of the node. Only if loaded_from_storage == True.
 		"""
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,

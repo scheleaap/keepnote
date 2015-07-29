@@ -73,8 +73,8 @@ x	test_move_to_different_notebook
 x	test_move_if_deleted
 x	test_save_with_dirty_parent
 x	test_save_with_unsaved_dirty_deleted_children
-	test node already exists with id for content/folder
-	test_*_with_duplicate/existing_id
+-	test node already exists with id for content/folder
+-	test_*_with_duplicate/existing_id
 x	test_set_title
 x	test_set_title_if_deleted
 x	test_save_set_title
