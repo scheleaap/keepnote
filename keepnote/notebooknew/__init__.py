@@ -273,7 +273,10 @@ class NotebookNode(object):
 		raise NotImplementedError('TODO')
 	
 	def move(self, target, behind=None):
-		"""TODO"""
+		"""TODO
+		
+		Cannot be used to move a node to another workbook. Use copy() for that instead.
+		"""
 		raise NotImplementedError('TODO')
 	
 	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
@@ -651,17 +654,217 @@ class FolderNode(NotebookNode):
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				node_id=node_id,
 				content_type=CONTENT_TYPE_FOLDER,
 				parent=parent,
 				title=title,
-				loaded_from_storage=loaded_from_storage
+				loaded_from_storage=loaded_from_storage,
+				node_id=node_id,
 				)
+		if loaded_from_storage:
+			if node_id is None:
+				raise IllegalArgumentCombinationError()
+		else:
+			if node_id is not None:
+				raise IllegalArgumentCombinationError()
+	
+	def can_add_new_content_child_node(self):
+		"""TODO"""
+		return not self.is_in_trash and not self.is_deleted
+	
+	def can_add_new_folder_child_node(self):
+		"""TODO"""
+		return not self.is_in_trash and not self.is_deleted
+	
+	def can_copy(self, target, with_subtree):
+		if self.is_deleted:
+			return False
+		elif target.is_trash or target.is_in_trash:
+			return False
+		elif with_subtree and self.is_node_a_child(target):
+			return False
+		else:
+			return True
+	
+	def can_move(self, target):
+		return \
+				not self.is_deleted and \
+				self._notebook == target._notebook and \
+				not self.is_root and \
+				not self.is_node_a_child(target)
+	
+	def copy(self, target, with_subtree, behind=None):
+		"""TODO"""
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot copy a deleted node')
+		elif target.is_trash or target.is_in_trash:
+			raise IllegalOperationError('Cannot copy a node to the trash')
+		elif with_subtree and self.is_node_a_child(target):
+			raise IllegalOperationError('Cannot copy a node with its children to a child')
+		
+		copy = target.new_folder_child_node(
+				node_id=new_node_id(),
+				title=self._title,
+				behind=behind
+				)
+		if with_subtree:
+			for child in self.children:
+				child.copy(copy, with_subtree=with_subtree)
+		
+		return copy
+	
+	def delete(self):
+		"""TODO"""
+		if self.parent is None:
+			raise IllegalOperationError('Cannot delete the root node')
+		for child in self.children:
+			child.delete()
+		self.parent.children.remove(self)
+		self.is_deleted = True
+		if NotebookNode.NEW in self._unsaved_changes:
+			self._unsaved_changes.remove(NotebookNode.NEW)
+		else:
+			self._unsaved_changes.append(NotebookNode.DELETED)
 	
 	@property
 	def is_dirty(self):
 		return len(self._unsaved_changes) != 0
-
+				
+	def is_node_a_child(self, node):
+		p = node.parent
+		while p is not None:
+			if p == self:
+				return True
+			else:
+				p = p.parent
+		return False
+	
+	@property
+	def is_in_trash(self):
+		if self.parent is not None:
+			return self.parent.is_trash or self.parent.is_in_trash
+		return False
+	
+	@property
+	def is_root(self):
+		return self.parent is None
+		
+	@property
+	def is_trash(self):
+		return False
+	
+	def move(self, target, behind=None):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot move a deleted node')
+		elif self._notebook != target._notebook:
+			raise IllegalOperationError('Cannot move a note to a node in another notebook')
+		elif self.is_root:
+			raise IllegalOperationError('Cannot move the root node')
+		elif self.is_node_a_child(target):
+			raise IllegalOperationError('Cannot move a node to one of its children')
+		
+		if behind is None:
+			target.children.append(self)
+		else:
+			try:
+				i = target.children.index(behind)
+				target.children.insert(i + 1, self)
+			except ValueError as e:
+				raise IllegalOperationError('Unknown child', e)
+		self.parent.children.remove(self)
+		self.parent = target
+		self._unsaved_changes.append(NotebookNode.MOVED)
+	
+	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
+#		if additional_payloads is None:
+#			additional_payloads = []
+		
+		if self.is_in_trash:
+			raise IllegalOperationError('Cannot add a child to a node in trash')
+		elif self.is_deleted:
+			raise IllegalOperationError('Cannot add a child to a deleted node')
+			
+		child = ContentNode(
+				notebook_storage=self._notebook_storage,
+				notebook=self._notebook,
+				content_type=content_type,
+				parent=self,
+				title=title,
+				loaded_from_storage=False,
+				main_payload=main_payload,
+				additional_payloads=additional_payloads
+				)
+		if behind is None:
+			self.children.append(child)
+		else:
+			try:
+				i = self.children.index(behind)
+				self.children.insert(i + 1, child)
+			except ValueError as e:
+				raise IllegalOperationError('Unknown child', e)
+	
+		return child
+	
+	def new_folder_child_node(self, title, behind=None):
+		if self.is_in_trash:
+			raise IllegalOperationError('Cannot add a child to a node in trash')
+		elif self.is_deleted:
+			raise IllegalOperationError('Cannot add a child to a deleted node')
+			
+		child = FolderNode(
+				notebook_storage=self._notebook_storage,
+				notebook=self._notebook,
+				parent=self,
+				title=title,
+				loaded_from_storage=False
+				)
+		if behind is None:
+			self.children.append(child)
+		else:
+			try:
+				i = self.children.index(behind)
+				self.children.insert(i + 1, child)
+			except ValueError as e:
+				raise IllegalOperationError('Unknown child', e)
+		
+		return child
+	
+	@property
+	def _notebook_storage_attributes(self):
+		"""TODO"""
+		attributes = {
+				TITLE_ATTRIBUTE: self._title,
+				}
+		if self.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+		return attributes
+	
+	def save(self):
+#		if not self.is_dirty:
+#			return
+		if self.parent is not None and self.parent.is_dirty:
+			raise IllegalOperationError('Cannot save a node if the parent has changes')
+		for child in self.children:
+			if child.is_deleted and child.is_dirty:
+				raise IllegalOperationError('Cannot save a node if it has dirty deleted children')
+		
+		if NotebookNode.NEW in self._unsaved_changes:
+			self._notebook_storage.add_node(
+					node_id=self.node_id,
+					content_type=self.content_type,
+					attributes=self._notebook_storage_attributes,
+					payloads=[])
+			self._unsaved_changes.remove(NotebookNode.NEW)
+		elif NotebookNode.DELETED in self._unsaved_changes:
+			self._notebook_storage.remove_node(self.node_id)
+			self._unsaved_changes.remove(NotebookNode.DELETED)
+		else:
+			if NotebookNode.CHANGED_TITLE in self._unsaved_changes or NotebookNode.MOVED in self._unsaved_changes:
+				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
+				if NotebookNode.CHANGED_TITLE in self._unsaved_changes:
+					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
+				if NotebookNode.MOVED in self._unsaved_changes:
+					self._unsaved_changes.remove(NotebookNode.MOVED)
+	
 	def __repr__(self):
 		return '{cls}[{node_id}, {title}]'.format(
 				cls=self.__class__.__name__,

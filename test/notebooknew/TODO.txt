@@ -44,21 +44,7 @@ NotebookTest
 	test_load_content_node_main_payload_name_missing
 	test_load_trash_node
 
-ContentFolderNodeTestBase
-
-ContentNodeTest
--	test_save_move_new
-x	test_save_move_from_storage
-x	test_save_root (omdat parent is None)
-x	test_save_new_and_deleted
-x	test_save_complex: parent (via move), title, additional_payload
-
-FolderTest
-	test_incorrect_content_type
-	test_copy
-	test_copy_payload_in_storage
-	test_save_delete
-	test_save_move
+TODO: Abstracte klasse voor ContentNode and FolderNode
 
 TrashTest
 	test_incorrect_content_type
