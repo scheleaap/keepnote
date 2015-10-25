@@ -1,5 +1,6 @@
 # NotebookNode
 
+- "TODO" invullen
 - new child with duplicate id
 - loading:
     created_time
@@ -32,29 +33,8 @@
 # NotebookError
 # NotebookVersionError
 
-Bugs in KeepNote, die gefixt zijn/worden:
-- Opslaan is niet consistent: node-inhoud wordt direct opgeslagen, metadata niet
-
-
-New Test Structure:
-
 NotebookTest
 	test_is_dirty
 	test_is_dirty_if_nodes_dirty
 	test_load_content_node_main_payload_name_missing
 	test_load_trash_node
-
-TODO: Abstracte klasse voor ContentNode and FolderNode
-
-TrashTest
-	test_incorrect_content_type
-	test_is_root
-	test_is_in_trash
-	test_delete
-	test_new_content_child_node_in_trash
-	test_new_folder_child_node_in_trash
-	test_copy
-	test_copy_after_sibling
-	test_copy_subtree
-	test_copy_subtree_to_child
-	test_move
