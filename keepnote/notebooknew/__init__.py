@@ -3,6 +3,7 @@ import io
 import os
 import uuid
 
+from keepnote.listening import Listeners
 from keepnote.pref import Pref
 from keepnote.notebooknew.storage import StoredNode
 
@@ -41,6 +42,9 @@ class Notebook(object):
 	@ivar root: The root NotebookNode.
 	@ivar trash: TODO
 	@ivar client_preferences: A Pref containing the notebook's client preferences.
+	@ivar node_changed_listeners: TODO
+	@ivar closing_listeners: TODO
+	@ivar close_listeners: TODO
 	@ivar is_dirty: TODO
 	"""
 	
@@ -53,23 +57,22 @@ class Notebook(object):
 		self.root = None
 		self.trash = None
 		self.client_preferences = Pref()
-		self.is_dirty = False
+		self.node_changed_listeners = Listeners()
+		self.closing_listeners = Listeners()
+		self.close_listeners = Listeners()
 		
 		self._init_from_storage()
-		
+	
+	def close(self):
+		self.closing_listeners.notify()
+		self.save()
+		self.close_listeners.notify()
+	
 	def _init_from_storage(self):
 		"""Initializes the Notebook from the NotebookStorage."""
 
 		# Load all StoredNodes.		
 		stored_nodes = list(self._notebook_storage.get_all_nodes())
-		
-		# If no nodes exist, create a single root node.
-		if stored_nodes == []:
-			node_id = new_node_id()
-			self._notebook_storage.add_node(node_id=node_id, content_type=CONTENT_TYPE_FOLDER, attributes={}, payloads=[])
-			# TODO: Enable this line (a test will fail)
-			#stored_nodes = self._notebook_storage.get_all_nodes()
-			stored_nodes.append(StoredNode(node_id=node_id, content_type=CONTENT_TYPE_FOLDER, attributes={}, payload_names=[]))
 		
 		# Create NotebookNodes for all StoredNotes and index all StoredNotes and NotebookNodes by id.
 		nodes_by_id = {}
@@ -131,28 +134,35 @@ class Notebook(object):
 					
 				parent_notebook_node = nodes_by_id[parent_id][1]
 				notebook_node.parent = parent_notebook_node
-				parent_notebook_node.children.append(notebook_node)
+				parent_notebook_node._add_child_node(notebook_node)
 			else:
 				if self.root is not None:
 					raise InvalidStructureError('Multiple root nodes found')
 				self.root = notebook_node
 			if notebook_node.content_type == CONTENT_TYPE_TRASH:
 				self.trash = notebook_node
+		
+		# If no root node exists, create it.
 		if self.root is None:
-			raise InvalidStructureError('No root node found')
-			
+			notebook_node = FolderNode(
+					notebook_storage=self._notebook_storage,
+					notebook=self,
+					parent=None,
+					title='',  # TODO
+					loaded_from_storage=False
+					)
+			self.root = notebook_node
+
 		# If no trash node exists, create it.
 		if self.trash is None:
-			node_id = new_node_id()
-			self._notebook_storage.add_node(node_id=node_id, content_type=CONTENT_TYPE_TRASH, attributes={ PARENT_ID_ATTRIBUTE: self.root.node_id }, payloads=[])
 			notebook_node = TrashNode(
 					notebook_storage=self._notebook_storage,
 					notebook=self,
-					node_id=node_id,
 					parent=self.root,
-					title='', # TODO
-					loaded_from_storage=True
+					title='',  # TODO
+					loaded_from_storage=False
 					)
+			self.root._add_child_node(notebook_node)
 			self.trash = notebook_node
 		
 		if self.trash.parent is not self.root:
@@ -160,27 +170,47 @@ class Notebook(object):
 		
 		# Sort children by their id.
 		for stored_node, notebook_node in nodes_by_id.values():
-			notebook_node.children.sort(key=lambda child_notebook_node: child_notebook_node.node_id)
+			notebook_node._children.sort(key=lambda child_notebook_node: child_notebook_node.node_id)
+	
+	@property
+	def is_dirty(self):
+		"""TODO"""
+		return any([node.is_dirty for node in self._traverse_tree()])
 	
 	def save(self):
 		"""Saves all changes to the notebook."""
-		pass
+		self._save_node(self.root)
+	
+	def _save_node(self, node):
+		"""TODO"""
+		for child in [child for child in node.get_children(unsaved_deleted=True) if child.is_deleted]:
+			self._save_node(child)
+		
+		node.save()
+		
+		for child in node.get_children(unsaved_deleted=False):
+			self._save_node(child)
 	
 	def _traverse_tree(self):
 		"""A generator method that yields all NotebookNodes in the notebook."""
-		pass
+		nodes_to_visit = [self.root]
+		while nodes_to_visit:
+			node = nodes_to_visit.pop()
+			yield node
+			for child in node.get_children(unsaved_deleted=True):
+				nodes_to_visit.append(child)
 		
 
 class NotebookNode(object):
 	"""A node in a notebook. Every node has an identifier, a content type and a title.
 	
 	@ivar node_id: The id of the node.
-	@ivar children: The node's children.
+	@ivar children: The node's children that have not been deleted and are waiting to be saved. TODO
 	@ivar content_type: The content type of the node.
 	@ivar parent: The parent of the node.
 	@ivar title: The title of the node.
 	@ivar is_dirty: Indicates whether the node has changed since it was last saved.
-	@ivar is_deleted: Indicates whether the node has been deleted from the notebook. 
+	@ivar is_deleted: Indicates whether the node has been deleted from the notebook.
 	"""
 	
 	class StorageChange(object):
@@ -212,18 +242,26 @@ class NotebookNode(object):
 		"""
 		self._notebook_storage = notebook_storage
 		self._notebook = notebook
-		self.children = []
+		self._children = []
 		self.content_type = content_type
 		self.is_deleted = False
 		self.parent = parent
 		self._title = title
 		self._unsaved_changes = []
 		if loaded_from_storage:
+			if node_id is None:
+				raise IllegalArgumentCombinationError()
 			self.node_id = node_id
 		else:
+			if node_id is not None:
+				raise IllegalArgumentCombinationError()
 			self.node_id = new_node_id()
 			self._unsaved_changes.append(NotebookNode.NEW)
 	
+	def _add_child_node(self, child_node):
+		self._children.append(child_node)
+		assert child_node.parent is self
+		
 	def can_add_new_content_child_node(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
@@ -243,6 +281,11 @@ class NotebookNode(object):
 	def can_move(self, target):
 		"""TODO"""
 		raise NotImplementedError('TODO')
+	
+	@property
+	def children(self):
+		"""TODO"""
+		return self.get_children(unsaved_deleted=False)
 	
 	def copy(self, target, with_subtree, behind=None):
 		"""TODO"""
@@ -276,6 +319,13 @@ class NotebookNode(object):
 		"""TODO"""
 		raise NotImplementedError('TODO')
 	
+	def get_children(self, unsaved_deleted=False):
+		"""TODO"""
+		if unsaved_deleted:
+			return self._children
+		else:
+			return [child for child in self._children if not child.is_deleted]
+	
 	def move(self, target, behind=None):
 		"""TODO
 		
@@ -304,6 +354,10 @@ class NotebookNode(object):
 		"""
 		raise NotImplementedError('TODO')
 	
+	def _remove_child_node(self, child_node):
+		assert child_node in self._children
+		self._children.remove(child_node)
+		
 	def save(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
@@ -355,11 +409,11 @@ class AbstractContentFolderNode(NotebookNode):
 		"""TODO"""
 		if self.parent is None:
 			raise IllegalOperationError('Cannot delete the root node')
-		for child in self.children:
+		for child in self._children:
 			child.delete()
-		self.parent.children.remove(self)
 		self.is_deleted = True
 		if NotebookNode.NEW in self._unsaved_changes:
+			self.parent._remove_child_node(self)
 			self._unsaved_changes.remove(NotebookNode.NEW)
 		else:
 			self._unsaved_changes.append(NotebookNode.DELETED)
@@ -402,14 +456,14 @@ class AbstractContentFolderNode(NotebookNode):
 			raise IllegalOperationError('Cannot move a node to one of its children')
 		
 		if behind is None:
-			target.children.append(self)
+			target._children.append(self)
 		else:
 			try:
-				i = target.children.index(behind)
-				target.children.insert(i + 1, self)
+				i = target._children.index(behind)
+				target._children.insert(i + 1, self)
 			except ValueError as e:
 				raise IllegalOperationError('Unknown child', e)
-		self.parent.children.remove(self)
+		self.parent._children.remove(self)
 		self.parent = target
 		self._unsaved_changes.append(NotebookNode.MOVED)
 	
@@ -433,11 +487,11 @@ class AbstractContentFolderNode(NotebookNode):
 				additional_payloads=additional_payloads
 				)
 		if behind is None:
-			self.children.append(child)
+			self._add_child_node(child)
 		else:
 			try:
-				i = self.children.index(behind)
-				self.children.insert(i + 1, child)
+				i = self._children.index(behind)
+				self._children.insert(i + 1, child)
 			except ValueError as e:
 				raise IllegalOperationError('Unknown child', e)
 	
@@ -457,11 +511,11 @@ class AbstractContentFolderNode(NotebookNode):
 				loaded_from_storage=False
 				)
 		if behind is None:
-			self.children.append(child)
+			self._add_child_node(child)
 		else:
 			try:
-				i = self.children.index(behind)
-				self.children.insert(i + 1, child)
+				i = self._children.index(behind)
+				self._children.insert(i + 1, child)
 			except ValueError as e:
 				raise IllegalOperationError('Unknown child', e)
 		
@@ -554,8 +608,9 @@ class ContentNode(AbstractContentFolderNode):
 				behind=behind
 				)
 		if with_subtree:
-			for child in self.children:
-				child.copy(copy, with_subtree=with_subtree)
+			for child in self._children:
+				if not child.is_deleted:
+					child.copy(copy, with_subtree=with_subtree)
 		
 		return copy
 	
@@ -593,11 +648,10 @@ class ContentNode(AbstractContentFolderNode):
 			raise PayloadDoesNotExistError(payload_name)
 	
 	def save(self):
-#		if not self.is_dirty:
-#			return
 		if self.parent is not None and self.parent.is_dirty:
-			raise IllegalOperationError('Cannot save a node if the parent has changes')
-		for child in self.children:
+			if not self.is_deleted or (self.is_deleted and not self.parent.is_deleted):
+				raise IllegalOperationError('Cannot save a node if the parent has changes and is not deleted')
+		for child in self._children:
 			if child.is_deleted and child.is_dirty:
 				raise IllegalOperationError('Cannot save a node if it has dirty deleted children')
 		
@@ -612,6 +666,7 @@ class ContentNode(AbstractContentFolderNode):
 		elif NotebookNode.DELETED in self._unsaved_changes:
 			self._notebook_storage.remove_node(self.node_id)
 			self._unsaved_changes.remove(NotebookNode.DELETED)
+			self.parent._remove_child_node(self)
 		else:
 			if NotebookNode.CHANGED_TITLE in self._unsaved_changes or NotebookNode.MOVED in self._unsaved_changes:
 				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
@@ -637,7 +692,7 @@ class ContentNode(AbstractContentFolderNode):
 			self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
 
 	def __repr__(self):
-		return '{cls}[{node_id}, {content_type}, {title}]'.format(
+		return '{cls}[{node_id}, {content_type}, {_title}]'.format(
 				cls=self.__class__.__name__,
 				dirty='*' if self.is_dirty else '-',
 				**self.__dict__
@@ -687,8 +742,9 @@ class FolderNode(AbstractContentFolderNode):
 				behind=behind
 				)
 		if with_subtree:
-			for child in self.children:
-				child.copy(copy, with_subtree=with_subtree)
+			for child in self._children:
+				if not child.is_deleted:
+					child.copy(copy, with_subtree=with_subtree)
 		
 		return copy
 	
@@ -703,11 +759,10 @@ class FolderNode(AbstractContentFolderNode):
 		return attributes
 	
 	def save(self):
-#		if not self.is_dirty:
-#			return
 		if self.parent is not None and self.parent.is_dirty:
-			raise IllegalOperationError('Cannot save a node if the parent has changes')
-		for child in self.children:
+			if not self.is_deleted or (self.is_deleted and not self.parent.is_deleted):
+				raise IllegalOperationError('Cannot save a node if the parent has changes and is not deleted')
+		for child in self._children:
 			if child.is_deleted and child.is_dirty:
 				raise IllegalOperationError('Cannot save a node if it has dirty deleted children')
 		
@@ -721,6 +776,7 @@ class FolderNode(AbstractContentFolderNode):
 		elif NotebookNode.DELETED in self._unsaved_changes:
 			self._notebook_storage.remove_node(self.node_id)
 			self._unsaved_changes.remove(NotebookNode.DELETED)
+			self.parent._remove_child_node(self)
 		else:
 			if NotebookNode.CHANGED_TITLE in self._unsaved_changes or NotebookNode.MOVED in self._unsaved_changes:
 				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
@@ -730,7 +786,7 @@ class FolderNode(AbstractContentFolderNode):
 					self._unsaved_changes.remove(NotebookNode.MOVED)
 	
 	def __repr__(self):
-		return '{cls}[{node_id}, {title}]'.format(
+		return '{cls}[{node_id}, {_title}]'.format(
 				cls=self.__class__.__name__,
 				dirty='*' if self.is_dirty else '-',
 				**self.__dict__
@@ -795,13 +851,13 @@ class TrashNode(NotebookNode):
 			raise IllegalOperationError('Cannot copy the trash node to a child')
 		
 		copy = target.new_folder_child_node(
-				node_id=new_node_id(),
 				title=self._title,
 				behind=behind
 				)
 		if with_subtree:
-			for child in self.children:
-				child.copy(copy, with_subtree=with_subtree)
+			for child in self._children:
+				if not child.is_deleted:
+					child.copy(copy, with_subtree=with_subtree)
 		
 		return copy
 	
@@ -853,11 +909,10 @@ class TrashNode(NotebookNode):
 		return attributes
 	
 	def save(self):
-#		if not self.is_dirty:
-#			return
 		if self.parent is not None and self.parent.is_dirty:
-			raise IllegalOperationError('Cannot save a node if the parent has changes')
-		for child in self.children:
+			if not self.is_deleted or (self.is_deleted and not self.parent.is_deleted):
+				raise IllegalOperationError('Cannot save a node if the parent has changes and is not deleted')
+		for child in self._children:
 			if child.is_deleted and child.is_dirty:
 				raise IllegalOperationError('Cannot save a node if it has dirty deleted children')
 		
@@ -875,7 +930,7 @@ class TrashNode(NotebookNode):
 					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
 	
 	def __repr__(self):
-		return '{cls}[{node_id}, {title}]'.format(
+		return '{cls}[{node_id}, {_title}]'.format(
 				cls=self.__class__.__name__,
 				dirty='*' if self.is_dirty else '-',
 				**self.__dict__

@@ -36,7 +36,6 @@ class InMemoryStorage(NotebookStorage):
 		payload = io.BytesIO()
 		payload.write(payload_file.read())
 		stored_node.payload_files[payload_name] = payload
-		
 		stored_node.payload_names.append(payload_name)
 	
 	def get_all_nodes(self):

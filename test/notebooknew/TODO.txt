@@ -12,6 +12,8 @@
     title_fgcolor
     title_bgcolor
     client_preferences
+- _add_child_node() invoeren -- parent als constructorparameter verwijderen
+- remove node._unsaved_changes from tests
 
 # - Remove the content type for trash nodes completely?
 # - trashed_from/deleted_from
@@ -38,3 +40,8 @@ NotebookTest
 	test_is_dirty_if_nodes_dirty
 	test_load_content_node_main_payload_name_missing
 	test_load_trash_node
+	test_close_with_changes()
+	  closing event raised
+	  save unsaved nodes
+	  close event raised
+	test_node_changed_event_raised()
