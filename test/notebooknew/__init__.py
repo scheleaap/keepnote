@@ -2,6 +2,7 @@
 
 import base64
 import copy
+from datetime import datetime
 import io
 import mock
 from mock import Mock, call
@@ -11,7 +12,6 @@ import unittest
 
 from keepnote.notebooknew import *
 from keepnote.notebooknew import CONTENT_TYPE_HTML, CONTENT_TYPE_TRASH, CONTENT_TYPE_FOLDER
-from keepnote.notebooknew import PARENT_ID_ATTRIBUTE, TITLE_ATTRIBUTE, MAIN_PAYLOAD_NAME_ATTRIBUTE
 from keepnote.notebooknew import new_node_id
 import keepnote.notebooknew.storage as storage
 from keepnote.notebooknew.storage import StoredNode
@@ -21,9 +21,30 @@ from xml.dom import NodeFilter
 from ast import NodeVisitor
 from lib2to3.tests.test_pytree import TestNodes
 
+PARENT_ID_ATTRIBUTE = 'parent_id'
+MAIN_PAYLOAD_NAME_ATTRIBUTE = 'main_payload_name'
+TITLE_ATTRIBUTE = 'title'
+CREATED_TIME_ATTRIBUTE = 'created_time'
+MODIFIED_TIME_ATTRIBUTE = 'modified_time'
+ORDER_ATTRIBUTE = 'order'
+ICON_NORMAL_ATTRIBUTE = 'icon'
+ICON_OPEN_ATTRIBUTE = 'icon_open'
+TITLE_COLOR_FOREGROUND_ATTRIBUTE = 'title_fgcolor'
+TITLE_COLOR_BACKGROUND_ATTRIBUTE = 'title_bgcolor'
+
+DEFAULT=object()
 DEFAULT_ID = 'my_id'
 DEFAULT_CONTENT_TYPE = CONTENT_TYPE_HTML
 DEFAULT_TITLE = 'my_title'
+DEFAULT_CREATED_TIMESTAMP = 1012615322
+DEFAULT_CREATED_TIME = datetime.utcfromtimestamp(DEFAULT_CREATED_TIMESTAMP)
+DEFAULT_MODIFIED_TIMESTAMP = 1012615322
+DEFAULT_MODIFIED_TIME = datetime.utcfromtimestamp(DEFAULT_MODIFIED_TIMESTAMP)
+DEFAULT_ORDER = 12
+DEFAULT_ICON_NORMAL = 'node_red_closed.png'
+DEFAULT_ICON_OPEN = 'node_red_open.png'
+DEFAULT_TITLE_COLOR_FOREGROUND = '#ffffff'
+DEFAULT_TITLE_COLOR_BACKGROUND = '#ff0000'
 DEFAULT_PAYLOAD_NAMES = ['my_payload1', 'my_payload2']
 DEFAULT_HTML_PAYLOAD_NAME = os.path.basename('index.html')
 DEFAULT_HTML_PAYLOAD = base64.b64decode('PCFET0NUWVBFIGh0bWw+DQoNCjxoMT5UZXN0IE5vZGU8L2gxPg0KPHA+VGhpcyBpcyBhIG5vZGUgdXNlZCBmb3IgdGVzdGluZy48L3A+DQo=')
@@ -69,25 +90,44 @@ class NotebookTest(unittest.TestCase):
 		"""Test loading a content node."""
 		# Initialize a NotebookStorage.
 		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_HTML,
 				attributes={
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
 						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
+						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
+						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
+						ORDER_ATTRIBUTE: DEFAULT_ORDER,
+						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
+						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
+						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
+						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
 						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)), (DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))]
+				payloads=[
+						(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)),
+						(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))
+						]
 				)
 		
 		# Initialize Notebook with the NotebookStorage.
 		notebook = Notebook(notebook_storage)
 		
 		# Verify the node.
-		node = notebook.root
+		node = [child for child in notebook.root.get_children() if child.node_id == DEFAULT_ID][0]
 		self.assertEqual(ContentNode, node.__class__)
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(CONTENT_TYPE_HTML, node.content_type)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(False, node.is_dirty)
@@ -97,12 +137,10 @@ class NotebookTest(unittest.TestCase):
 		
 		# Initialize a NotebookStorage.
 		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_HTML,
 				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
 						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
 						},
 				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
@@ -112,19 +150,83 @@ class NotebookTest(unittest.TestCase):
 		notebook = Notebook(notebook_storage)
 		
 		# Verify the node.
-		node = notebook.root.children[0]
-		self.assertEqual('', node.title)
+		node = notebook.root
+		self.assertIsNotNone(node.title)
+	
+	def test_load_content_node_missing_payload(self):
+		"""Test loading a content node without payload."""
+		
+		# Initialize a NotebookStorage.
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(
+				node_id=DEFAULT_ID,
+				content_type=CONTENT_TYPE_HTML,
+				attributes={
+						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						},
+				payloads=[]
+				)
+		
+		with self.assertRaises(InvalidStructureError):
+			# Initialize Notebook with the NotebookStorage.
+			Notebook(notebook_storage)
+	
+	def test_load_content_node_missing_main_payload_name(self):
+		"""Test loading a content node without payload."""
+		
+		# Initialize a NotebookStorage.
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(
+				node_id=DEFAULT_ID,
+				content_type=CONTENT_TYPE_HTML,
+				attributes={
+						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						},
+				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
+				)
+		
+		with self.assertRaises(InvalidStructureError):
+			# Initialize Notebook with the NotebookStorage.
+			Notebook(notebook_storage)
+	
+	def test_load_content_node_missing_main_payload_data(self):
+		"""Test loading a content node without payload."""
+		
+		# Initialize a NotebookStorage.
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(
+				node_id=DEFAULT_ID,
+				content_type=CONTENT_TYPE_HTML,
+				attributes={
+						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
+						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						},
+				payloads=[(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))]
+				)
+		
+		with self.assertRaises(InvalidStructureError):
+			# Initialize Notebook with the NotebookStorage.
+			Notebook(notebook_storage)
 	
 	def test_load_folder_node(self):
 		"""Test loading a folder node."""
 		
 		# Initialize a NotebookStorage.
 		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_FOLDER,
 				attributes={
+						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
 						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
+						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
+						ORDER_ATTRIBUTE: DEFAULT_ORDER,
+						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
+						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
+						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
+						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
 						},
 				payloads=[]
 				)
@@ -133,11 +235,18 @@ class NotebookTest(unittest.TestCase):
 		notebook = Notebook(notebook_storage)
 		
 		# Verify the node.
-		node = notebook.root
+		node = [child for child in notebook.root.get_children() if child.node_id == DEFAULT_ID][0]
 		self.assertEqual(FolderNode, node.__class__)
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(CONTENT_TYPE_FOLDER, node.content_type)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(False, node.is_dirty)
 	
 	def test_load_folder_node_missing_title(self):
@@ -159,8 +268,8 @@ class NotebookTest(unittest.TestCase):
 		notebook = Notebook(notebook_storage)
 		
 		# Verify the node.
-		node = notebook.root.children[0]
-		self.assertEqual('', node.title)	
+		node = notebook.root
+		self.assertIsNotNone(node.title)	
 	
 	def test_load_trash_node(self):
 		"""Test loading a trash node."""
@@ -174,6 +283,13 @@ class NotebookTest(unittest.TestCase):
 				attributes={
 						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
 						TITLE_ATTRIBUTE: DEFAULT_TITLE,
+						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
+						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
+						ORDER_ATTRIBUTE: DEFAULT_ORDER,
+						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
+						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
+						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
+						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
 						},
 				payloads=[]
 				)
@@ -183,12 +299,41 @@ class NotebookTest(unittest.TestCase):
 		
 		# Verify the node.
 		node = notebook.trash
-		self.assertEqual(notebook.root.children[0], node)
+		self.assertEqual([child for child in notebook.root.children if child.node_id == DEFAULT_ID][0], node)
 		self.assertEqual(TrashNode, node.__class__)
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(CONTENT_TYPE_TRASH, node.content_type)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(False, node.is_dirty)
+	
+	def test_load_trash_node_missing_title(self):
+		"""Test loading a trash node without a title."""
+		
+		# Initialize a NotebookStorage.
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
+		notebook_storage.add_node(
+				node_id=DEFAULT_ID,
+				content_type=CONTENT_TYPE_TRASH,
+				attributes={
+						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
+						},
+				payloads=[]
+				)
+		
+		# Initialize Notebook with the NotebookStorage.
+		notebook = Notebook(notebook_storage)
+		
+		# Verify the node.
+		node = notebook.root
+		self.assertIsNotNone(node.title)	
 	
 	def test_structure_only_root(self):
 		"""Test the NotebookNode structure with a just a root."""
@@ -469,7 +614,6 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
 	
-	@unittest.skip("TODO")
 	def test_save_with_changes1(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
@@ -485,7 +629,6 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(5, len(list(notebook_storage.get_all_nodes())))
 	
-	@unittest.skip("TODO")
 	def test_save_with_changes2(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
@@ -516,7 +659,6 @@ class NotebookTest(unittest.TestCase):
 		handler.assert_has_calls([call.on_closing(), call.on_close()])
 	
 	# TODO: Consider making the desktop client responsible for saving before closing.
-	@unittest.skip("TODO")
 	def test_close_with_changes(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = [ROOT_SN, TRASH_SN]
@@ -549,18 +691,32 @@ class NotebookTest(unittest.TestCase):
 		
 		self.fail("TODO");
 	
-	@unittest.skip("TODO")
-	def test_custom_listeners(self):
+	def get_client_event_listeners(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
 		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.get_custom_event_listener("my-event").add(handler.on_event)
+		notebook.get_client_event_listeners("my-event").add(handler.on_event)
 
 
 class ContentFolderTrashNodeTestBase(object):
-	def _create_node(self, notebook_storage=None, notebook=None, parent=None, loaded_from_storage=False):
+	def _create_node(
+			self,
+			notebook_storage=None,
+			notebook=None,
+			parent=None,
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
+			):
 		"""Creates a node of the class under test."""
 		raise NotImplementedError()
 	
@@ -571,6 +727,34 @@ class ContentFolderTrashNodeTestBase(object):
 	def _get_proper_copy_method(self, target_mock):
 		"""Returns the proper method to copy a node of the class under test on a mock object."""
 		raise NotImplementedError()
+	
+	def test_constructor_parameters_new_n1(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			self._create_node(
+					loaded_from_storage=False,
+					node_id='12345',  # Must be None if not loaded from storage
+					)
+	
+	def test_constructor_parameters_new_n2(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			self._create_node(
+					loaded_from_storage=False,
+					created_time=datetime.now(),  # Must be None if not loaded from storage
+					)
+	
+	def test_constructor_parameters_new_n3(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			self._create_node(
+					loaded_from_storage=False,
+					modified_time=datetime.now(),  # Must be None if not loaded from storage
+					)
+	
+	def test_constructor_parameters_from_storage_n1(self):
+		with self.assertRaises(IllegalArgumentCombinationError):
+			self._create_node(
+					loaded_from_storage=True,
+					node_id=None,  # Must not be None if loaded from storage
+					)
 	
 	def test_is_root_1(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
@@ -1482,31 +1666,55 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			notebook_storage=None,
 			notebook=None,
 			parent=None,
-			loaded_from_storage=False
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
 			):
 		
-		content_type = DEFAULT_CONTENT_TYPE
-		title = DEFAULT_TITLE
 		if loaded_from_storage:
 			main_payload = None
 			additional_payloads = None
-			node_id = new_node_id()
+			if node_id is DEFAULT:
+				node_id = new_node_id()
+			if created_time is DEFAULT:
+				created_time = DEFAULT_CREATED_TIME
+			if modified_time is DEFAULT:
+				modified_time = DEFAULT_MODIFIED_TIME
 			main_payload_name = DEFAULT_HTML_PAYLOAD_NAME
 			additional_payload_names = [DEFAULT_PNG_PAYLOAD_NAME]
 		else:
 			main_payload = (DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD)
 			additional_payloads = [(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)]
-			node_id = None
+			if node_id is DEFAULT:
+				node_id = None
+			if created_time is DEFAULT:
+				created_time = None
+			if modified_time is DEFAULT:
+				modified_time = None
 			main_payload_name = None
 			additional_payload_names = None
 		
 		node = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				content_type=content_type,
+				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
+				title=title,
+				created_time=created_time,
+				modified_time=modified_time,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
 				main_payload=main_payload,
 				additional_payloads=additional_payloads,
 				node_id=node_id,
@@ -1536,8 +1744,13 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
@@ -1546,6 +1759,13 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		self.assertEqual(DEFAULT_CONTENT_TYPE, node.content_type)
 		self.assertEqual(parent, node.parent)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
+		self.assertEqual(node.created_time, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD, node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))
@@ -1560,11 +1780,18 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+				node_id=DEFAULT_ID,
+				created_time=DEFAULT_CREATED_TIME,
+				modified_time=DEFAULT_MODIFIED_TIME,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
@@ -1572,7 +1799,13 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(DEFAULT_CONTENT_TYPE, node.content_type)
 		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(False, node.is_dirty)
@@ -1580,31 +1813,15 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		self.assertEqual([], node._unsaved_changes)
 		repr(node)
 	
-	def test_constructor_parameters_new_1(self):
+	def test_constructor_parameters_new_c1(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
-					title=DEFAULT_TITLE,
 					loaded_from_storage=False,
-					main_payload=(DEFAULT_HTML_PAYLOAD_NAME,DEFAULT_HTML_PAYLOAD),
-					additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
-					node_id='12345',  # Must be None if not loaded from storage
-					main_payload_name=None,
-					additional_payload_names=None,
-					)
-	
-	def test_constructor_parameters_new_2(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			ContentNode(
-					notebook_storage=None,
-					notebook=None,
-					content_type=DEFAULT_CONTENT_TYPE,
-					parent=None,
 					title=DEFAULT_TITLE,
-					loaded_from_storage=False,
 					main_payload=None,  # Must not be None if not loaded from storage
 					additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 					node_id=None,
@@ -1612,15 +1829,15 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 					additional_payload_names=None,
 					)
 	
-	def test_constructor_parameters_new_3(self):
+	def test_constructor_parameters_new_c2(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
-					title=DEFAULT_TITLE,
 					loaded_from_storage=False,
+					title=DEFAULT_TITLE,
 					main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 					additional_payloads=None,  # Must not be None if not loaded from storage
 					node_id=None,
@@ -1628,31 +1845,15 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 					additional_payload_names=None,
 					)
 	
-	def test_constructor_parameters_from_storage_1(self):
+	def test_constructor_parameters_from_storage_c1(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
-					title=DEFAULT_TITLE,
 					loaded_from_storage=True,
-					main_payload=None,
-					additional_payloads=None,
-					node_id=None,  # Must not be None if loaded from storage
-					main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
-					additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
-					)
-	
-	def test_constructor_parameters_from_storage_2(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			ContentNode(
-					notebook_storage=None,
-					notebook=None,
-					content_type=DEFAULT_CONTENT_TYPE,
-					parent=None,
 					title=DEFAULT_TITLE,
-					loaded_from_storage=True,
 					main_payload=None,
 					additional_payloads=None,
 					node_id=DEFAULT_ID,
@@ -1660,15 +1861,15 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 					additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 					)
 	
-	def test_constructor_parameters_from_storage_3(self):
+	def test_constructor_parameters_from_storage_c2(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
 			ContentNode(
 					notebook_storage=None,
 					notebook=None,
 					content_type=DEFAULT_CONTENT_TYPE,
 					parent=None,
-					title=DEFAULT_TITLE,
 					loaded_from_storage=True,
+					title=DEFAULT_TITLE,
 					main_payload=None,
 					additional_payloads=None,
 					node_id=DEFAULT_ID,
@@ -1685,8 +1886,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
@@ -1695,8 +1896,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		# Verify the node.
 		expected = {
 				PARENT_ID_ATTRIBUTE: parent.node_id,
-				TITLE_ATTRIBUTE: 'new title',
 				MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
+				TITLE_ATTRIBUTE: 'new title',
 				}
 		self.assertEqual(expected, node._notebook_storage_attributes)
 		
@@ -1706,8 +1907,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_JPG_PAYLOAD_NAME, DEFAULT_JPG_PAYLOAD)],
 				)
@@ -1726,8 +1927,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[],
 				)
@@ -1745,8 +1946,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
@@ -1766,8 +1967,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[],
 				)
@@ -1788,8 +1989,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[],
 				)
@@ -1803,8 +2004,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[],
 				)
@@ -1827,8 +2028,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
@@ -1855,8 +2056,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[],
 				)
@@ -1873,8 +2074,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[],
 				)
@@ -1898,8 +2099,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[],
 				)
@@ -1925,8 +2126,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
@@ -1962,8 +2163,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
@@ -2009,8 +2210,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
@@ -2049,8 +2250,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
@@ -2090,8 +2291,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_JPG_PAYLOAD_NAME]
 				)
@@ -2127,8 +2328,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[]
 				)
@@ -2166,8 +2367,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME]
 				)
@@ -2204,8 +2405,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[]
 				)
@@ -2243,8 +2444,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				node_id=DEFAULT_ID,
 				content_type=DEFAULT_CONTENT_TYPE,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME]
 				)
@@ -2335,22 +2536,47 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			notebook_storage=None,
 			notebook=None,
 			parent=None,
-			loaded_from_storage=False
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
 			):
 		
-		title = DEFAULT_TITLE
 		if loaded_from_storage:
-			node_id = new_node_id()
+			if node_id is DEFAULT:
+				node_id = new_node_id()
+			if created_time is DEFAULT:
+				created_time = DEFAULT_CREATED_TIME
+			if modified_time is DEFAULT:
+				modified_time = DEFAULT_MODIFIED_TIME
 		else:
-			node_id = None
+			if node_id is DEFAULT:
+				node_id = None
+			if created_time is DEFAULT:
+				created_time = None
+			if modified_time is DEFAULT:
+				modified_time = None
 		
 		node = FolderNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
-				node_id=node_id
+				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		if parent is not None:
 			parent._add_child_node(node)
@@ -2371,13 +2597,25 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 				)
 		
 		self.assertEqual(AnyUuidMatcher(), node.node_id)
 		self.assertEqual(parent, node.parent)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
+		self.assertEqual(node.created_time, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
@@ -2388,41 +2626,33 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		node = FolderNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+				node_id=DEFAULT_ID,
+				created_time=DEFAULT_CREATED_TIME,
+				modified_time=DEFAULT_MODIFIED_TIME,
 				)
 		
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(parent, node.parent)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual([], node._unsaved_changes)
 		repr(node)
-	
-	def test_constructor_parameters_new(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			FolderNode(
-					notebook_storage=None,
-					notebook=None,
-					parent=None,
-					title=DEFAULT_TITLE,
-					loaded_from_storage=False,
-					node_id='12345',  # Must be None if not loaded from storage
-					)
-	
-	def test_constructor_parameters_from_storage(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			FolderNode(
-					notebook_storage=None,
-					notebook=None,
-					parent=None,
-					title=DEFAULT_TITLE,
-					loaded_from_storage=True,
-					node_id=None,  # Must not be None if loaded from storage
-					)
 	
 	def test_notebook_storage_attributes(self):
 		# Create the node and the parent.
@@ -2432,8 +2662,8 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		node.title = 'new title'
 		
@@ -2452,8 +2682,8 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		original.new_folder_child_node(title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
@@ -2486,8 +2716,8 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook=None,
 				node_id=DEFAULT_ID,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				)
 		original.new_folder_child_node(title=DEFAULT_TITLE)
 		target = Mock(spec=NotebookNode)
@@ -2521,8 +2751,8 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook_storage=notebook_storage,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		
 		# Save the node.
@@ -2555,8 +2785,8 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				notebook_storage=notebook_storage,
 				notebook=None,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		
 		# Save the node.
@@ -2629,22 +2859,47 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 			notebook_storage=None,
 			notebook=None,
 			parent=None,
-			loaded_from_storage=False
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
 			):
 		
-		title = DEFAULT_TITLE
 		if loaded_from_storage:
-			node_id = new_node_id()
+			if node_id is DEFAULT:
+				node_id = new_node_id()
+			if created_time is DEFAULT:
+				created_time = DEFAULT_CREATED_TIME
+			if modified_time is DEFAULT:
+				modified_time = DEFAULT_MODIFIED_TIME
 		else:
-			node_id = None
+			if node_id is DEFAULT:
+				node_id = None
+			if created_time is DEFAULT:
+				created_time = None
+			if modified_time is DEFAULT:
+				modified_time = None
 		
 		node = TrashNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
-				node_id=node_id
+				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		if parent is not None:
 			parent._add_child_node(node)
@@ -2665,13 +2920,25 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 				)
 		
 		self.assertEqual(AnyUuidMatcher(), node.node_id)
 		self.assertEqual(parent, node.parent)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
+		self.assertEqual(node.created_time, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
@@ -2682,41 +2949,33 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 		node = TrashNode(
 				notebook_storage=None,
 				notebook=None,
-				node_id=DEFAULT_ID,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+				node_id=DEFAULT_ID,
+				created_time=DEFAULT_CREATED_TIME,
+				modified_time=DEFAULT_MODIFIED_TIME,
 				)
 		
 		self.assertEqual(DEFAULT_ID, node.node_id)
 		self.assertEqual(parent, node.parent)
 		self.assertEqual(DEFAULT_TITLE, node.title)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual([], node._unsaved_changes)
 		repr(node)
-	
-	def test_constructor_parameters_new(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			TrashNode(
-					notebook_storage=None,
-					notebook=None,
-					parent=None,
-					title=DEFAULT_TITLE,
-					loaded_from_storage=False,
-					node_id='12345',  # Must be None if not loaded from storage
-					)
-	
-	def test_constructor_parameters_from_storage(self):
-		with self.assertRaises(IllegalArgumentCombinationError):
-			TrashNode(
-					notebook_storage=None,
-					notebook=None,
-					parent=None,
-					title=DEFAULT_TITLE,
-					loaded_from_storage=True,
-					node_id=None,  # Must not be None if loaded from storage
-					)
 	
 	def test_is_trash(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
@@ -2739,8 +2998,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		node.title = 'new title'
 		
@@ -2759,8 +3018,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook=None,
 				node_id=DEFAULT_ID,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				)
 		parent._add_child_node(node)
 		child = Mock(spec=NotebookNode)
@@ -2815,8 +3074,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook_storage=None,
 				notebook=None,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		child = Mock(spec=NotebookNode)
 		child.parent = original
@@ -2851,8 +3110,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook=None,
 				node_id=DEFAULT_ID,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
 				)
 		child = Mock(spec=NotebookNode)
 		child.parent = original
@@ -2956,8 +3215,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook_storage=notebook_storage,
 				notebook=None,
 				parent=parent,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		
 		# Save the node.
@@ -2990,8 +3249,8 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 				notebook_storage=notebook_storage,
 				notebook=None,
 				parent=None,
-				title=DEFAULT_TITLE,
 				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
 				)
 		
 		# Save the node.
@@ -3047,7 +3306,7 @@ class FileMatcher(object):
 class TestNotebookNode(NotebookNode):
 	"""A testing implementation of NotebookNode."""
 
-	def __init__(self, notebook_storage=None, notebook=None, parent=None, add_to_parent=None, title=DEFAULT_TITLE, loaded_from_storage=True, node_id=None):
+	def __init__(self, notebook_storage=None, notebook=None, parent=None, add_to_parent=None, loaded_from_storage=True, title=DEFAULT_TITLE, node_id=None):
 		if node_id is None:
 			node_id = new_node_id()
 		super(TestNotebookNode, self).__init__(
@@ -3055,8 +3314,8 @@ class TestNotebookNode(NotebookNode):
 				notebook=notebook,
 				content_type=u'application/x-notebook-test',
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
+				title=title,
 				node_id=node_id,
 				)
 		

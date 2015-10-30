@@ -2,46 +2,47 @@
 
 - "TODO" invullen
 - new child with duplicate id
-- loading:
-    created_time
-    modified_time
-    order
-    duplicate_of
-    icon
-    icon_open
-    title_fgcolor
-    title_bgcolor
-    client_preferences
 - _add_child_node() invoeren -- parent als constructorparameter verwijderen
 - remove node._unsaved_changes from tests
+- Notebook.ui_prefs
+  - set attributes -> save -> get attributes
+- multiple trash nodes
+- trash parent != root
+- repairing incorrect structures
+- NotebookError
+- NotebookVersionError
+- basetreeview._add_model_column(): get = lambda ...
 
-# - Remove the content type for trash nodes completely?
-# - trashed_from/deleted_from
-# - ContentNode.trash()
-# - FolderNode.trash()
-# - TrashNode.empty()
-# - dirty if >= 1 nodes are dirty or if notebook is dirty
-# - only save nodes that have been changed
-# - only save notebook if it has been changed
-# - Notebook.ui_prefs
-#   - set attributes -> save -> get attributes
-# - Notebook.default_font
-# - Notebook.icons
-# - Notebook.node_changed = Listeners()  # signature = (node, recurse)
-# - ordering ?
-# - multiple trash nodes
-# - trash parent != root
-# - repairing incorrect structures
-# NotebookError
-# NotebookVersionError
+Notebook
+	default_font   The default font for new nodes.
+	icons          A set of icons that can be assigned to nodes.
+	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
+Node
+x	created_time   Timestamp of the time at which the node was created
+x	modified_time  Timestamp of the time at which the node was last modified
+	order          (?)
+x	icon           Associated icon (usually displayed in tree or list views)
+x	icon_open      Associated icon when node is open (usually displayed in tree or list views)
+x	title_fgcolor  Title foreground color (usually displayed in tree or list views)
+x	title_bgcolor  Title background color (usually displayed in tree or list views)
+?	duplicate_of
+?	trashed_from/deleted_from
+?	has_children()
+?	get_parent()
+?	get_notebook()
+
+ContentNode/FolderNode
+	trash()
+x	no payload
+x	payload, but no main payload name set
+x	main payload name set, put payload not there
+x	created_time, modified_time only when loading from storage
+	test that order actually determines the order (or does the ListView take care of that?)
+
+TrashNode
+	empty()
 
 NotebookTest
-	test_is_dirty
-	test_is_dirty_if_nodes_dirty
 	test_load_content_node_main_payload_name_missing
 	test_load_trash_node
-	test_close_with_changes()
-	  closing event raised
-	  save unsaved nodes
-	  close event raised
-	test_node_changed_event_raised()
+	test_node_changed_event_raised() (currently @unittest.skip)

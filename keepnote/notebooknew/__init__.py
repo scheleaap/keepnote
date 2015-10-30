@@ -1,10 +1,14 @@
-from collections import OrderedDict
+
+from collections import namedtuple, OrderedDict
+from datetime import datetime
 import io
 import os
+import sys
 import uuid
 
 from keepnote.listening import Listeners
 from keepnote.pref import Pref
+from keepnote.notebook import AttrDef
 from keepnote.notebooknew.storage import StoredNode
 
 __all__ = [
@@ -22,15 +26,51 @@ __all__ = [
 		]
 
 # Content types
-CONTENT_TYPE_HTML = u"text/html"
-CONTENT_TYPE_TRASH = u"application/x-notebook-trash"
-CONTENT_TYPE_FOLDER = u"application/x-notebook-dir"
-#CONTENT_TYPE_UNKNOWN = u"application/x-notebook-unknown"
+CONTENT_TYPE_HTML = u'text/html'
+CONTENT_TYPE_TRASH = u'application/x-notebook-trash'
+CONTENT_TYPE_FOLDER = u'application/x-notebook-dir'
+#CONTENT_TYPE_UNKNOWN = u'application/x-notebook-unknown'
 
-# Attribute names
-PARENT_ID_ATTRIBUTE = 'parent_id'
-TITLE_ATTRIBUTE = 'title'
-MAIN_PAYLOAD_NAME_ATTRIBUTE = 'main_payload_name'
+# Attribute definitions
+AttributeDefinition = namedtuple('AttributeDefinition', ['key', 'type', 'default'], verbose=False)
+PARENT_ID_ATTRIBUTE = AttributeDefinition('parent_id', type='string', default=None)
+MAIN_PAYLOAD_NAME_ATTRIBUTE = AttributeDefinition('main_payload_name', type='string', default=None)
+TITLE_ATTRIBUTE = AttributeDefinition('title', type='string', default='Untitled node')
+CREATED_TIME_ATTRIBUTE = AttributeDefinition('created_time', type='timestamp', default=None)
+MODIFIED_TIME_ATTRIBUTE = AttributeDefinition('modified_time', type='timestamp', default=None)
+ORDER_ATTRIBUTE = AttributeDefinition('order', type='int', default=sys.maxint)
+ICON_NORMAL_ATTRIBUTE = AttributeDefinition('icon', type='string', default=None)
+ICON_OPEN_ATTRIBUTE = AttributeDefinition('icon_open', type='string', default=None)
+TITLE_COLOR_FOREGROUND_ATTRIBUTE = AttributeDefinition('title_fgcolor', type='string', default=None)
+TITLE_COLOR_BACKGROUND_ATTRIBUTE = AttributeDefinition('title_bgcolor', type='string', default=None)
+
+# New nodes
+NEW_CONTENT_TYPE = CONTENT_TYPE_HTML
+NEW_PAYLOAD_NAME = 'page.html'
+NEW_PAYLOAD_DATA = u"""
+<!doctype html>
+<html>
+<meta charset="utf-8">
+<title>title</title>
+"""
+
+def get_attribute_value(attribute_definition, attributes):
+	"""Returns the value of an attribute from a dictionary of strings, using the specified attribute definition.
+	
+	@param attribute_definition: The AttributeDefinition that specifies the attribute's key, type and default value.
+	@param attributes: The attributes to get the value from.
+	@return: attributes[attribute_definition.key] converted to the proper type if it exists in attributes, else attribute_definition.default
+	"""
+	if attribute_definition.key in attributes:
+		string_value = attributes[attribute_definition.key]
+		if attribute_definition.type == 'string':
+			return string_value
+		elif attribute_definition.type == 'int':
+			return int(string_value)
+		elif attribute_definition.type == 'timestamp':
+			return datetime.utcfromtimestamp(int(string_value))
+	else:
+		return attribute_definition.default
 
 def new_node_id():
 	"""Generate a new, random node id."""
@@ -60,6 +100,7 @@ class Notebook(object):
 		self.node_changed_listeners = Listeners()
 		self.closing_listeners = Listeners()
 		self.close_listeners = Listeners()
+		self._client_event_listeners = {}
 		
 		self._init_from_storage()
 	
@@ -67,6 +108,16 @@ class Notebook(object):
 		self.closing_listeners.notify()
 		self.save()
 		self.close_listeners.notify()
+	
+	def get_client_event_listeners(self, key):
+		"""Returns a custom event listeners object for the notebook's client, creating it if necessary.
+		
+		@param key The key of the event listeners object.
+		@return A Listener.
+		"""
+		if key not in self._client_event_listeners:
+			self._client_event_listeners[key] = Listeners()
+		return self._client_event_listeners[key]
 	
 	def _init_from_storage(self):
 		"""Initializes the Notebook from the NotebookStorage."""
@@ -77,36 +128,80 @@ class Notebook(object):
 		# Create NotebookNodes for all StoredNotes and index all StoredNotes and NotebookNodes by id.
 		nodes_by_id = {}
 		for stored_node in stored_nodes:
-			title = stored_node.attributes[TITLE_ATTRIBUTE] if TITLE_ATTRIBUTE in stored_node.attributes else ''
+			title = get_attribute_value(TITLE_ATTRIBUTE, stored_node.attributes)
+			created_time = get_attribute_value(CREATED_TIME_ATTRIBUTE, stored_node.attributes)
+			modified_time = get_attribute_value(MODIFIED_TIME_ATTRIBUTE, stored_node.attributes)
+			order = get_attribute_value(ORDER_ATTRIBUTE, stored_node.attributes)
+			icon_normal = get_attribute_value(ICON_NORMAL_ATTRIBUTE, stored_node.attributes)
+			icon_open = get_attribute_value(ICON_OPEN_ATTRIBUTE, stored_node.attributes)
+			title_color_foreground = get_attribute_value(TITLE_COLOR_FOREGROUND_ATTRIBUTE, stored_node.attributes)
+			title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, stored_node.attributes)
+			
 			if stored_node.content_type == CONTENT_TYPE_FOLDER:
 				notebook_node = FolderNode(
 						notebook_storage=self._notebook_storage,
 						notebook=self,
-						node_id=stored_node.node_id,
 						parent=None,
+						loaded_from_storage=True,
 						title=title,
-						loaded_from_storage=True
+						order=order,
+						icon_normal=icon_normal,
+						icon_open=icon_open,
+						title_color_foreground=title_color_foreground,
+						title_color_background=title_color_background,
+						node_id=stored_node.node_id,
+						created_time=created_time,
+						modified_time=modified_time,
 						)
 			elif stored_node.content_type == CONTENT_TYPE_TRASH:
 				notebook_node = TrashNode(
 						notebook_storage=self._notebook_storage,
 						notebook=self,
-						node_id=stored_node.node_id,
 						parent=None,
+						loaded_from_storage=True,
 						title=title,
-						loaded_from_storage=True
+						order=order,
+						icon_normal=icon_normal,
+						icon_open=icon_open,
+						title_color_foreground=title_color_foreground,
+						title_color_background=title_color_background,
+						node_id=stored_node.node_id,
+						created_time=created_time,
+						modified_time=modified_time,
 						)
 			else:
-				main_payload_name = stored_node.attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE]
+				if not stored_node.payload_names:
+					raise InvalidStructureError('Content node {node_id} has no payload'.format(
+							node_id=stored_node.node_id))
+					
+				main_payload_name = get_attribute_value(MAIN_PAYLOAD_NAME_ATTRIBUTE, stored_node.attributes)
+				
+				if main_payload_name is None:
+					raise InvalidStructureError('Missing attribute \'{attribute}\' in content node {node_id}'.format(
+							node_id=stored_node.node_id,
+							attribute=MAIN_PAYLOAD_NAME_ATTRIBUTE.key))
+				elif main_payload_name not in stored_node.payload_names:
+					raise InvalidStructureError(
+							'The main payload with name \'{main_payload_name}\' is missing in content node {node_id}'.format(
+									node_id=stored_node.node_id,
+									main_payload_name=main_payload_name))
+				
 				additional_payload_names = [payload_name for payload_name in stored_node.payload_names if payload_name != main_payload_name]
 				notebook_node = ContentNode(
 						notebook_storage=self._notebook_storage,
 						notebook=self,
-						node_id=stored_node.node_id,
 						content_type=stored_node.content_type,
 						parent=None,
-						title=title,
 						loaded_from_storage=True,
+						title=title,
+						order=order,
+						icon_normal=icon_normal,
+						icon_open=icon_open,
+						title_color_foreground=title_color_foreground,
+						title_color_background=title_color_background,
+						node_id=stored_node.node_id,
+						created_time=created_time,
+						modified_time=modified_time,
 						main_payload_name=main_payload_name,
 						additional_payload_names=additional_payload_names,
 						)
@@ -114,8 +209,8 @@ class Notebook(object):
 		
 		# Create the NotebookNode tree structure.
 		for stored_node, notebook_node in nodes_by_id.values():
-			if PARENT_ID_ATTRIBUTE in stored_node.attributes:
-				parent_id = stored_node.attributes[PARENT_ID_ATTRIBUTE]
+			parent_id = get_attribute_value(PARENT_ID_ATTRIBUTE, stored_node.attributes)
+			if parent_id is not None:
 				if parent_id not in nodes_by_id:
 					raise InvalidStructureError('Node {child_id} has no parent {parent_id}'.format(
 							child_id=stored_node.node_id, parent_id=parent_id))
@@ -148,7 +243,7 @@ class Notebook(object):
 					notebook_storage=self._notebook_storage,
 					notebook=self,
 					parent=None,
-					title='',  # TODO
+					title=TITLE_ATTRIBUTE.default,
 					loaded_from_storage=False
 					)
 			self.root = notebook_node
@@ -159,7 +254,7 @@ class Notebook(object):
 					notebook_storage=self._notebook_storage,
 					notebook=self,
 					parent=self.root,
-					title='',  # TODO
+					title=TITLE_ATTRIBUTE.default,
 					loaded_from_storage=False
 					)
 			self.root._add_child_node(notebook_node)
@@ -209,6 +304,13 @@ class NotebookNode(object):
 	@ivar content_type: The content type of the node.
 	@ivar parent: The parent of the node.
 	@ivar title: The title of the node.
+	@ivar created_time: TODO
+	@ivar modified_time: TODO
+	@ivar order: TODO
+	@ivar icon_normal: TODO
+	@ivar icon_open: TODO
+	@ivar title_color_foreground: TODO
+	@ivar title_color_background: TODO
 	@ivar is_dirty: Indicates whether the node has changed since it was last saved.
 	@ivar is_deleted: Indicates whether the node has been deleted from the notebook.
 	"""
@@ -229,16 +331,39 @@ class NotebookNode(object):
 	CHANGED_TITLE = StorageChange('CHANGED_TITLE')
 	MOVED = StorageChange('MOVED')
 
-	def __init__(self, notebook_storage, notebook, content_type, parent, title, loaded_from_storage, node_id):
+	def __init__(
+			self,
+			notebook_storage,
+			notebook,
+			content_type,
+			parent,
+			loaded_from_storage,
+			title,
+			order=None,
+			icon_normal=None,
+			icon_open=None,
+			title_color_foreground=None,
+			title_color_background=None,
+			node_id=None,
+			created_time=None,
+			modified_time=None
+			):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
-		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param title: The title of the node.
+		@param order: TODO
+		@param icon_normal: TODO
+		@param icon_open: TODO
+		@param title_color_foreground: TODO
+		@param title_color_background: TODO
 		@param node_id: The id of the new node. Only if loaded_from_storage == True.
+		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
+		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
 		self._notebook_storage = notebook_storage
 		self._notebook = notebook
@@ -247,15 +372,28 @@ class NotebookNode(object):
 		self.is_deleted = False
 		self.parent = parent
 		self._title = title
+		self.order = order
+		self.icon_normal = icon_normal
+		self.icon_open = icon_open
+		self.title_color_foreground = title_color_foreground
+		self.title_color_background = title_color_background
 		self._unsaved_changes = []
 		if loaded_from_storage:
 			if node_id is None:
 				raise IllegalArgumentCombinationError()
 			self.node_id = node_id
+			self.created_time = created_time
+			self.modified_time = modified_time
 		else:
 			if node_id is not None:
 				raise IllegalArgumentCombinationError()
+			if created_time is not None:
+				raise IllegalArgumentCombinationError()
+			if modified_time is not None:
+				raise IllegalArgumentCombinationError()
 			self.node_id = new_node_id()
+			self.created_time = datetime.now()
+			self.modified_time = self.created_time
 			self._unsaved_changes.append(NotebookNode.NEW)
 	
 	def _add_child_node(self, child_node):
@@ -535,8 +673,27 @@ class ContentNode(AbstractContentFolderNode):
 	
 	# Idea: Use classmethods for loading from storage / for creating new in memory
 
-	def __init__(self, notebook_storage, notebook, content_type, parent, title, loaded_from_storage, 
-			main_payload=None, additional_payloads=None, node_id=None, main_payload_name=None, additional_payload_names=None):
+	def __init__(
+			self,
+			notebook_storage,
+			notebook,
+			content_type,
+			parent,
+			loaded_from_storage,
+			title,
+			order=None,
+			icon_normal=None,
+			icon_open=None,
+			title_color_foreground=None,
+			title_color_background=None,
+			main_payload=None,
+			additional_payloads=None,
+			node_id=None,
+			created_time=None,
+			modified_time=None,
+			main_payload_name=None,
+			additional_payload_names=None
+			):
 		"""Constructor.
 		
 		Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed.
@@ -545,23 +702,36 @@ class ContentNode(AbstractContentFolderNode):
 		@param notebook: The notebook the node is in.
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
-		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param title: The title of the node.
+		@param order: TODO
+		@param icon_normal: TODO
+		@param icon_open: TODO
+		@param title_color_foreground: TODO
+		@param title_color_background: TODO
 		@param main_payload: A tuple consisting of the main paylad name and the main payload data. Only if loaded_from_storage == False.
 		@param additional_payloads: A list containing tuples consisting of paylad names and payload data. Only if loaded_from_storage == False.
 		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
+		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		@param main_payload_name: The name of the main payload. Only if loaded_from_storage == True.
 		@param additional_payload_names: The names of the additional payloads. Only if loaded_from_storage == True.
-		@param is_dirty: Indicates whether the node has changed since it was last saved.
 		"""
 		super(ContentNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				content_type=content_type,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
+				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
 				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		if loaded_from_storage:
 			if node_id is None or main_payload_name is None or additional_payload_names is None:
@@ -627,11 +797,11 @@ class ContentNode(AbstractContentFolderNode):
 	def _notebook_storage_attributes(self):
 		"""TODO"""
 		attributes = {
-				TITLE_ATTRIBUTE: self._title,
-				MAIN_PAYLOAD_NAME_ATTRIBUTE: self.main_payload_name
+				TITLE_ATTRIBUTE.key: self._title,
+				MAIN_PAYLOAD_NAME_ATTRIBUTE.key: self.main_payload_name
 				}
 		if self.parent is not None:
-			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+			attributes[PARENT_ID_ATTRIBUTE.key] = self.parent.node_id
 		return attributes
 	
 	def remove_additional_payload(self, payload_name):
@@ -703,24 +873,52 @@ class FolderNode(AbstractContentFolderNode):
 	"""A folder node in a notebook. A folder node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, parent, title, loaded_from_storage, node_id=None):
+	def __init__(self,
+			notebook_storage,
+			notebook,
+			parent,
+			loaded_from_storage,
+			title,
+			order=None,
+			icon_normal=None,
+			icon_open=None,
+			title_color_foreground=None,
+			title_color_background=None,
+			node_id=None,
+			created_time=None,
+			modified_time=None,
+			):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
 		@param parent: The parent of the node or None.
-		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param title: The title of the node.
+		@param order: TODO
+		@param icon_normal: TODO
+		@param icon_open: TODO
+		@param title_color_foreground: TODO
+		@param title_color_background: TODO
 		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
+		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
 		super(FolderNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				content_type=CONTENT_TYPE_FOLDER,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
+				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
 				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		if loaded_from_storage:
 			if node_id is None:
@@ -752,10 +950,10 @@ class FolderNode(AbstractContentFolderNode):
 	def _notebook_storage_attributes(self):
 		"""TODO"""
 		attributes = {
-				TITLE_ATTRIBUTE: self._title,
+				TITLE_ATTRIBUTE.key: self._title,
 				}
 		if self.parent is not None:
-			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+			attributes[PARENT_ID_ATTRIBUTE.key] = self.parent.node_id
 		return attributes
 	
 	def save(self):
@@ -796,24 +994,52 @@ class TrashNode(NotebookNode):
 	"""A trash node in a notebook. A trash node has no content.
 	"""
 
-	def __init__(self, notebook_storage, notebook, parent, title, loaded_from_storage, node_id=None):
+	def __init__(self,
+			notebook_storage,
+			notebook,
+			parent,
+			loaded_from_storage,
+			title,
+			order=None,
+			icon_normal=None,
+			icon_open=None,
+			title_color_foreground=None,
+			title_color_background=None,
+			node_id=None,
+			created_time=None,
+			modified_time=None,
+			):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use.
 		@param notebook: The notebook the node is in.
 		@param parent: The parent of the node or None.
-		@param title: The title of the node.
 		@param loaded_from_storage: TODO
+		@param title: The title of the node.
+		@param order: TODO
+		@param icon_normal: TODO
+		@param icon_open: TODO
+		@param title_color_foreground: TODO
+		@param title_color_background: TODO
 		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
+		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
 		super(TrashNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				content_type=CONTENT_TYPE_TRASH,
 				parent=parent,
-				title=title,
 				loaded_from_storage=loaded_from_storage,
+				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
 				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		if loaded_from_storage:
 			if node_id is None:
@@ -902,10 +1128,10 @@ class TrashNode(NotebookNode):
 	def _notebook_storage_attributes(self):
 		"""TODO"""
 		attributes = {
-				TITLE_ATTRIBUTE: self._title,
+				TITLE_ATTRIBUTE.key: self._title,
 				}
 		if self.parent is not None:
-			attributes[PARENT_ID_ATTRIBUTE] = self.parent.node_id
+			attributes[PARENT_ID_ATTRIBUTE.key] = self.parent.node_id
 		return attributes
 	
 	def save(self):
