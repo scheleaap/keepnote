@@ -14,9 +14,10 @@
 - basetreeview._add_model_column(): get = lambda ...
 
 Notebook
+?	title
 	default_font   The default font for new nodes.
 	icons          A set of icons that can be assigned to nodes.
-	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
+x	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
 Node
 x	created_time   Timestamp of the time at which the node was created
 x	modified_time  Timestamp of the time at which the node was last modified
@@ -27,9 +28,19 @@ x	title_fgcolor  Title foreground color (usually displayed in tree or list views
 x	title_bgcolor  Title background color (usually displayed in tree or list views)
 ?	duplicate_of
 ?	trashed_from/deleted_from
-?	has_children()
-?	get_parent()
-?	get_notebook()
+x	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
+x	has_children()
+-	get_parent()
+-	get_notebook()
+
+TODO: HIER BEZIG:
+ContentNode/FolderNode/TrashNode
+	modified_time changes on change
+	modifying order, icon_*, title_color_* -> is dirty == True
+	saving order, icon_*, title_color_*
+x	save client preferences as well
+	test that order actually determines the order (or does the ListView take care of that?)
+	making sure 0 < order < len(children)
 
 ContentNode/FolderNode
 	trash()
@@ -37,12 +48,11 @@ x	no payload
 x	payload, but no main payload name set
 x	main payload name set, put payload not there
 x	created_time, modified_time only when loading from storage
-	test that order actually determines the order (or does the ListView take care of that?)
 
 TrashNode
 	empty()
 
 NotebookTest
-	test_load_content_node_main_payload_name_missing
-	test_load_trash_node
+x	test_load_content_node_main_payload_name_missing
+x	test_load_trash_node
 	test_node_changed_event_raised() (currently @unittest.skip)

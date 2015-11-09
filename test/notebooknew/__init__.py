@@ -8,6 +8,7 @@ import mock
 from mock import Mock, call
 import os
 import re
+from pytz import utc
 import unittest
 
 from keepnote.notebooknew import *
@@ -31,15 +32,16 @@ ICON_NORMAL_ATTRIBUTE = 'icon'
 ICON_OPEN_ATTRIBUTE = 'icon_open'
 TITLE_COLOR_FOREGROUND_ATTRIBUTE = 'title_fgcolor'
 TITLE_COLOR_BACKGROUND_ATTRIBUTE = 'title_bgcolor'
+CLIENT_PREFERENCES_ATTRIBUTE = 'client_preferences'
 
 DEFAULT=object()
 DEFAULT_ID = 'my_id'
 DEFAULT_CONTENT_TYPE = CONTENT_TYPE_HTML
 DEFAULT_TITLE = 'my_title'
 DEFAULT_CREATED_TIMESTAMP = 1012615322
-DEFAULT_CREATED_TIME = datetime.utcfromtimestamp(DEFAULT_CREATED_TIMESTAMP)
-DEFAULT_MODIFIED_TIMESTAMP = 1012615322
-DEFAULT_MODIFIED_TIME = datetime.utcfromtimestamp(DEFAULT_MODIFIED_TIMESTAMP)
+DEFAULT_CREATED_TIME = datetime.fromtimestamp(DEFAULT_CREATED_TIMESTAMP, tz=utc)
+DEFAULT_MODIFIED_TIMESTAMP = 2000000000
+DEFAULT_MODIFIED_TIME = datetime.fromtimestamp(DEFAULT_MODIFIED_TIMESTAMP, tz=utc)
 DEFAULT_ORDER = 12
 DEFAULT_ICON_NORMAL = 'node_red_closed.png'
 DEFAULT_ICON_OPEN = 'node_red_open.png'
@@ -70,6 +72,10 @@ CHILD2_SN = StoredNode('child2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_A
 CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payload_names=[])
 TRASH_SN = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payload_names=[])
 
+
+def datetime_to_timestamp(dt):
+	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
+	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
 class NotebookTest(unittest.TestCase):
 	def test_load_notebook(self):
@@ -581,7 +587,7 @@ class NotebookTest(unittest.TestCase):
 		
 		# Verify the storage.
 		self.assertEqual(False, notebook_storage.add_node.called)
-		
+	
 	def test_client_preferences(self):
 		"""Test the setting and getting of Notebook client preferences."""
 		
@@ -728,6 +734,71 @@ class ContentFolderTrashNodeTestBase(object):
 		"""Returns the proper method to copy a node of the class under test on a mock object."""
 		raise NotImplementedError()
 	
+	def test_create_new_n(self):
+		parent = TestNotebookNode()
+		
+		node = self._create_node(
+				parent=parent,
+				loaded_from_storage=False,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+				)
+		
+		self.assertEqual(AnyUuidMatcher(), node.node_id)
+		self.assertEqual(parent, node.parent)
+# 		self.assertEqual(DEFAULT_TITLE, node.title)
+# 		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
+# 		self.assertEqual(node.created_time, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
+		self.assertEqual(Pref(), node.client_preferences)
+		self.assertEqual(True, node.is_dirty)
+		self.assertEqual(False, node.is_deleted)
+		self.assertEqual(False, node.has_children())
+		self.assertEqual([], node.children)
+		repr(node)
+		
+	def test_create_from_storage_n(self):
+		parent = TestNotebookNode()
+		
+		node = self._create_node(
+				parent=parent,
+				loaded_from_storage=True,
+				title=DEFAULT_TITLE,
+				order=DEFAULT_ORDER,
+				icon_normal=DEFAULT_ICON_NORMAL,
+				icon_open=DEFAULT_ICON_OPEN,
+				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+				node_id=DEFAULT_ID,
+				created_time=DEFAULT_CREATED_TIME,
+				modified_time=DEFAULT_MODIFIED_TIME,
+				)
+		
+		self.assertEqual(DEFAULT_ID, node.node_id)
+		self.assertEqual(parent, node.parent)
+# 		self.assertEqual(DEFAULT_TITLE, node.title)
+# 		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+# 		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+		self.assertEqual(DEFAULT_ORDER, node.order)
+		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
+		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
+		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
+		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
+		self.assertEqual(Pref(), node.client_preferences)
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual(False, node.is_deleted)
+		self.assertEqual(False, node.has_children())
+		self.assertEqual([], node.children)
+		repr(node)
+	
 	def test_constructor_parameters_new_n1(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
 			self._create_node(
@@ -756,6 +827,24 @@ class ContentFolderTrashNodeTestBase(object):
 					node_id=None,  # Must not be None if loaded from storage
 					)
 	
+	def test_notebook_storage_attributes_parent_id(self):
+		parent = TestNotebookNode()
+		node = self._create_node(parent=parent)
+		
+		self.assertEqual(parent.node_id, node._notebook_storage_attributes[PARENT_ID_ATTRIBUTE])
+	
+	def test_notebook_storage_attributes_title(self):
+		node = self._create_node()
+		node.title = 'new title'
+		
+		self.assertEqual('new title', node._notebook_storage_attributes[TITLE_ATTRIBUTE])
+	
+	def test_notebook_storage_attributes_client_preferences(self):
+		node = self._create_node()
+		node.client_preferences.set('custom_value', True)
+		
+		self.assertEqual({ 'custom_value': True }, node._notebook_storage_attributes[CLIENT_PREFERENCES_ATTRIBUTE])
+		
 	def test_is_root_1(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
 		
@@ -792,31 +881,270 @@ class ContentFolderTrashNodeTestBase(object):
 		
 		self.assertEqual(False, node.is_node_a_child(other_node))
 	
-	def test_set_title_new(self):
-		# Create the node.
-		node = self._create_node(parent=None, loaded_from_storage=False)
-		self.assertNotEquals('new title', node.title)
+	def test_title_init_set_and_save_new(self):
+		"""Tests setting and saving the title of a new node."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, title=DEFAULT_TITLE, loaded_from_storage=False)
+		self.assertEqual(DEFAULT_TITLE, node.title)
 
-		# Set the title.
+		# Change the node's title.
 		node.title = 'new title'
 		
-		# Verify the node.
 		self.assertEqual('new title', node.title)
 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.add_node.assert_called_once_with(
+				node_id=node.node_id,
+				content_type=mock.ANY,
+				attributes=AttributeMatcher(TITLE_ATTRIBUTE, node.title),
+				payloads=mock.ANY)
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
-	def test_set_title_from_storage(self):
-		# Create the node.
-		node = self._create_node(parent=None, loaded_from_storage=True)
-		self.assertNotEquals('new title', node.title)
+	def test_title_init_set_and_save_from_storage(self):
+		"""Tests setting and saving the title of a node loaded from storage."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, title=DEFAULT_TITLE, loaded_from_storage=True)
+		self.assertEqual(DEFAULT_TITLE, node.title)
 
-		# Set the title.
+		# Change the node's title.
 		node.title = 'new title'
 		
-		# Verify the node.
 		self.assertEqual('new title', node.title)
 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual([NotebookNode.CHANGED_TITLE], node._unsaved_changes)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, AttributeMatcher(TITLE_ATTRIBUTE, node.title))
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_created_time_init_and_save_new(self):
+		"""Tests saving the created time of a new node."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, loaded_from_storage=False)
+		self.assertEqual(utc, node.created_time.tzinfo)
+		self.assertEqual(True, abs(utc.localize(datetime.utcnow()) - node.created_time).total_seconds() < 5)
+		original_created_time = node.created_time
+
+		# Try changing the node's created time.
+		with self.assertRaises(Exception):
+			node.created_time = datetime.now(tz=utc)
+		
+		self.assertEqual(original_created_time, node.created_time)
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.add_node.assert_called_once_with(
+				node_id=node.node_id,
+				content_type=mock.ANY,
+				attributes=AttributeMatcher(CREATED_TIME_ATTRIBUTE, datetime_to_timestamp(node.created_time)),
+				payloads=mock.ANY)
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_created_time_init_and_save_from_storage(self):
+		"""Tests saving the created time of a node loaded from storage."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, created_time=DEFAULT_CREATED_TIME, loaded_from_storage=True)
+		self.assertEqual(utc, node.created_time.tzinfo)
+		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
+		original_created_time = node.created_time
+
+		# Try changing the node's created time.
+		with self.assertRaises(Exception):
+			node.created_time = datetime.now(tz=utc)
+
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual(original_created_time, node.created_time)
+		
+		# Change something else to save the node.
+		node.title = 'new title'
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, AttributeMatcher(CREATED_TIME_ATTRIBUTE, DEFAULT_CREATED_TIMESTAMP))
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_created_time_init_unset(self):
+		"""Tests loading a node from storage without a created time."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, created_time=None, loaded_from_storage=True)
+		self.assertEqual(None, node.created_time)
+		
+		# Change something else to save the node.
+		node.title = 'new title'
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, MissingAttributeMatcher(CREATED_TIME_ATTRIBUTE))
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+	
+	def test_modified_time_init_and_save_new(self):
+		"""Tests saving the modified time of a new node."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, loaded_from_storage=False)
+		self.assertEqual(utc, node.modified_time.tzinfo)
+		self.assertEqual(node.created_time, node.modified_time)
+
+		# Change the node's modified time.
+		new_modified_time = datetime.now(tz=utc)
+		node.modified_time = new_modified_time
+		
+		self.assertEqual(new_modified_time, node.modified_time)
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.add_node.assert_called_once_with(
+				node_id=node.node_id,
+				content_type=mock.ANY,
+				attributes=AttributeMatcher(MODIFIED_TIME_ATTRIBUTE, datetime_to_timestamp(node.modified_time)),
+				payloads=mock.ANY)
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_modified_time_init_and_save_from_storage(self):
+		"""Tests saving the modified time of a node loaded from storage."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, modified_time=DEFAULT_MODIFIED_TIME, loaded_from_storage=True)
+		self.assertEqual(utc, node.modified_time.tzinfo)
+		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
+
+		# Change the node's modified time.
+		new_modified_time = datetime.now(tz=utc)
+		node.modified_time = new_modified_time
+		
+		self.assertEqual(new_modified_time, node.modified_time)
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, AttributeMatcher(MODIFIED_TIME_ATTRIBUTE, datetime_to_timestamp(new_modified_time)))
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_modified_time_init_unset(self):
+		"""Tests loading a node from storage without a modified time."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, modified_time=None, loaded_from_storage=True)
+		self.assertEqual(None, node.modified_time)
+		
+		# Change something else to save the node.
+		node.title = 'new title'
+		self.assertEqual(True, node.is_dirty)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, MissingAttributeMatcher(MODIFIED_TIME_ATTRIBUTE))
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+	
+	def test_client_preferences_set_and_save_new(self):
+		"""Tests setting and saving the client preferences of a new node."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, loaded_from_storage=False)
+		
+		# Change the node's client preferences.
+		node.client_preferences.get('test', 'key', define=True)
+		node.client_preferences.set('test', 'key', 'value')
+		
+		expected = Pref()
+		expected.get('test', 'key', define=True)
+		expected.set('test', 'key', 'value')
+		self.assertEqual(expected, node.client_preferences)
+		self.assertEqual(True, node.is_dirty)
+		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
+		
+		# Save the node.
+		node.save()
+		
+		notebook_storage.add_node.assert_called_once_with(node_id=node.node_id, content_type=mock.ANY, attributes=AttributeMatcher(CLIENT_PREFERENCES_ATTRIBUTE, node.client_preferences._data), payloads=mock.ANY)
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Save the node again.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
+	
+	def test_client_preferences_set_and_save_from_storage(self):
+		"""Tests setting and saving the client preferences of a node loaded from storage."""
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		node = self._create_node(notebook_storage=notebook_storage, loaded_from_storage=True)
+		
+		# Change the node's client preferences.
+		node.client_preferences.get('test', 'key', define=True)
+		node.client_preferences.set('test', 'key', 'value')
+
+		expected = Pref()
+		expected.get('test', 'key', define=True)
+		expected.set('test', 'key', 'value')
+		self.assertEqual(expected, node.client_preferences)
+		self.assertEqual(True, node.is_dirty)
+		self.assertEqual(True, node.is_dirty)
+
+		# Save the node.
+		node.save()
+		
+		# Verify the storage.
+		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, AttributeMatcher(CLIENT_PREFERENCES_ATTRIBUTE, node.client_preferences._data))
+		
+		# Verify the node.
+		self.assertEqual(False, node.is_dirty)
+		self.assertEqual([], node._unsaved_changes)
+		
+		# Verify that saving the node again does nothing.
+		notebook_storage.reset_mock()
+		node.save()
+		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
 	def test_copy_behind_sibling(self):
 		# Create the original and target nodes.
@@ -891,7 +1219,7 @@ class ContentFolderTrashNodeTestBase(object):
 		
 		# Verify the children.
 		child1.copy.assert_called_once_with(copy, with_subtree=True)
-		self.assertEquals(False, child2.copy.called)
+		self.assertEqual(False, child2.copy.called)
 	
 	def test_save_not_dirty(self):
 		# Create a mocked NotebookStorage.
@@ -907,32 +1235,6 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual(False, notebook_storage.add_node.called)
 		self.assertEqual(False, notebook_storage.add_node_payload.called)
 		self.assertEqual(False, notebook_storage.remove_node_payload.called)
-	
-	def test_save_set_title_from_storage(self):
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node.
-		node = self._create_node(notebook_storage=notebook_storage, parent=None, loaded_from_storage=True)
-
-		# Set the node's title.
-		node.title = 'new title'
-		
-		# Save the node.
-		node.save()
-		
-		# Verify the storage.
-		notebook_storage.set_node_attributes.assert_called_once_with(node.node_id, node._notebook_storage_attributes)
-		
-		# Verify the node.
-		self.assertEqual(False, node.is_dirty)
-		self.assertEqual([], node._unsaved_changes)
-		
-		# Verify that saving the node again does nothing.
-		notebook_storage.reset_mock()
-		node._unsaved_changes.append(NotebookNode.DUMMY_CHANGE)
-		node.save()
-		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
 	def test_save_new_with_dirty_parent(self):
 		"""Tests saving a new node with a dirty parent."""
@@ -979,7 +1281,6 @@ class ContentFolderTrashNodeTestBase(object):
 		
 		# Verify the node.
 		self.assertEqual(True, node.is_dirty)
-	
 
 	
 class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
@@ -1128,6 +1429,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 				)
 		
 		# Verify the parent.
+		self.assertEqual(True, node.has_children())
 		self.assertEqual([child], node.children)
 		
 		# Verify the child.
@@ -1228,6 +1530,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		child = node.new_folder_child_node(title=DEFAULT_TITLE)
 		
 		# Verify the parent.
+		self.assertEqual(True, node.has_children())
 		self.assertEqual([child], node.children)
 		
 		# Verify the child.
@@ -1737,8 +2040,9 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _get_proper_copy_method(self, target_mock):
 		return target_mock.new_content_child_node
 	
-	def test_create_new(self):
-		parent = Mock(spec=NotebookNode)
+	def test_create_new_c(self):
+		parent = TestNotebookNode()
+		
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
@@ -1755,28 +2059,14 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
 		
-		self.assertEqual(AnyUuidMatcher(), node.node_id)
-		self.assertEqual(DEFAULT_CONTENT_TYPE, node.content_type)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
-		self.assertEqual(node.created_time, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD, node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))
 		self.assertEqual(DEFAULT_PNG_PAYLOAD, node.get_payload(DEFAULT_PNG_PAYLOAD_NAME))
-		self.assertEqual(True, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
-		repr(node)
 		
-	def test_create_from_storage(self):
-		parent = Mock(spec=NotebookNode)
+	def test_create_from_storage_c(self):
+		parent = TestNotebookNode()
+		
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
@@ -1796,22 +2086,8 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
 				)
 		
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(DEFAULT_CONTENT_TYPE, node.content_type)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
-		self.assertEqual(False, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([], node._unsaved_changes)
-		repr(node)
 	
 	def test_constructor_parameters_new_c1(self):
 		with self.assertRaises(IllegalArgumentCombinationError):
@@ -1877,29 +2153,19 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 					additional_payload_names=None,  # Must not be None if loaded from storage
 					)
 	
-	def test_notebook_storage_attributes(self):
-		# Create the node and the parent.
-		parent = Mock(spec=NotebookNode)
-		parent.node_id = new_node_id()
+	def test_notebook_storage_attributes_main_payload_name(self):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
-				parent=parent,
+				parent=None,
 				loaded_from_storage=False,
 				title=DEFAULT_TITLE,
 				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
 				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)],
 				)
-		node.title = 'new title'
 		
-		# Verify the node.
-		expected = {
-				PARENT_ID_ATTRIBUTE: parent.node_id,
-				MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-				TITLE_ATTRIBUTE: 'new title',
-				}
-		self.assertEqual(expected, node._notebook_storage_attributes)
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node._notebook_storage_attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE])
 		
 	def test_add_additional_payload_new(self):
 		node = ContentNode(
@@ -2590,89 +2856,6 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	
 	def _get_proper_copy_method(self, target_mock):
 		return target_mock.new_folder_child_node
-
-	def test_create_new(self):
-		parent = Mock(spec=NotebookNode)
-		node = FolderNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				order=DEFAULT_ORDER,
-				icon_normal=DEFAULT_ICON_NORMAL,
-				icon_open=DEFAULT_ICON_OPEN,
-				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
-				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
-				)
-		
-		self.assertEqual(AnyUuidMatcher(), node.node_id)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
-		self.assertEqual(node.created_time, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(True, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
-		repr(node)
-		
-	def test_create_from_storage(self):
-		parent = Mock(spec=NotebookNode)
-		node = FolderNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=True,
-				title=DEFAULT_TITLE,
-				order=DEFAULT_ORDER,
-				icon_normal=DEFAULT_ICON_NORMAL,
-				icon_open=DEFAULT_ICON_OPEN,
-				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
-				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
-				node_id=DEFAULT_ID,
-				created_time=DEFAULT_CREATED_TIME,
-				modified_time=DEFAULT_MODIFIED_TIME,
-				)
-		
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(False, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([], node._unsaved_changes)
-		repr(node)
-	
-	def test_notebook_storage_attributes(self):
-		# Create the node and the parent.
-		parent = Mock(spec=NotebookNode)
-		parent.node_id = new_node_id()
-		node = FolderNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				)
-		node.title = 'new title'
-		
-		# Verify the node.
-		expected = {
-				PARENT_ID_ATTRIBUTE: parent.node_id,
-				TITLE_ATTRIBUTE: 'new title',
-				}
-		self.assertEqual(expected, node._notebook_storage_attributes)
 	
 	def test_copy_new(self):
 		"""Tests copying a single node without its children."""
@@ -2913,69 +3096,6 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 	
 	def _get_proper_copy_method(self, target_mock):
 		return target_mock.new_folder_child_node
-
-	def test_create_new(self):
-		parent = Mock(spec=NotebookNode)
-		node = TrashNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				order=DEFAULT_ORDER,
-				icon_normal=DEFAULT_ICON_NORMAL,
-				icon_open=DEFAULT_ICON_OPEN,
-				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
-				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
-				)
-		
-		self.assertEqual(AnyUuidMatcher(), node.node_id)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(True, abs((datetime.now() - node.created_time).total_seconds()) < 1)
-		self.assertEqual(node.created_time, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(True, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([NotebookNode.NEW], node._unsaved_changes)
-		repr(node)
-		
-	def test_create_from_storage(self):
-		parent = Mock(spec=NotebookNode)
-		node = TrashNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=True,
-				title=DEFAULT_TITLE,
-				order=DEFAULT_ORDER,
-				icon_normal=DEFAULT_ICON_NORMAL,
-				icon_open=DEFAULT_ICON_OPEN,
-				title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
-				title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
-				node_id=DEFAULT_ID,
-				created_time=DEFAULT_CREATED_TIME,
-				modified_time=DEFAULT_MODIFIED_TIME,
-				)
-		
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(parent, node.parent)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(False, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
-		self.assertEqual([], node._unsaved_changes)
-		repr(node)
 	
 	def test_is_trash(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
@@ -2989,26 +3109,6 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 		node = self._create_node(parent=parent, loaded_from_storage=True)
 		
 		self.assertEqual(False, node.is_in_trash)
-	
-	def test_notebook_storage_attributes(self):
-		# Create the node and the parent.
-		parent = Mock(spec=NotebookNode)
-		parent.node_id = new_node_id()
-		node = TrashNode(
-				notebook_storage=None,
-				notebook=None,
-				parent=parent,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				)
-		node.title = 'new title'
-		
-		# Verify the node.
-		expected = {
-				PARENT_ID_ATTRIBUTE: parent.node_id,
-				TITLE_ATTRIBUTE: 'new title',
-				}
-		self.assertEqual(expected, node._notebook_storage_attributes)
 	
 	def test_delete(self):
 		# Create the node, the parent and the child.
@@ -3295,6 +3395,20 @@ class AllButOneUuidMatcher(AnyUuidMatcher):
 	def __eq__(self, other):
 		return super(AllButOneUuidMatcher, self).__eq__(other) and other != self.uuid
 
+class AttributeMatcher(object):
+	def __init__(self, attribute, expected_value):
+		self.attribute = attribute
+		self.expected_value = expected_value
+	
+	def __eq__(self, other):
+		if self.attribute not in other:
+			return False
+		result = other[self.attribute] == self.expected_value
+		return result
+	
+	def __ne__(self, other):
+		return not self.__eq__(other);
+
 class FileMatcher(object):
 	def __init__(self, expected):
 		self.expected = expected.read()
@@ -3302,6 +3416,19 @@ class FileMatcher(object):
 	def __eq__(self, other):
 		actual = other.read()
 		return self.expected == actual
+	
+	def __ne__(self, other):
+		return not self.__eq__(other);
+
+class MissingAttributeMatcher(object):
+	def __init__(self, attribute):
+		self.attribute = attribute
+	
+	def __eq__(self, other):
+		return self.attribute not in other
+	
+	def __ne__(self, other):
+		return not self.__eq__(other);
 
 class TestNotebookNode(NotebookNode):
 	"""A testing implementation of NotebookNode."""
