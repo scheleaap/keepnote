@@ -58,10 +58,6 @@ WWW=/var/www/dev/rasm/keepnote
 
 dev: venv
 	$(VENV) && pip install -r requirements-dev.txt
-	npm install
-	[ -f bower ] || ln -s node_modules/.bin/bower bower
-	[ -f gulp ] || ln -s node_modules/.bin/gulp gulp
-	./bower install
 
 venv: $(VENV_DIR)/bin/activate
 
@@ -74,13 +70,9 @@ cq:
 
 test: venv
 	$(VENV) && nosetests -sv tests/*.py
-	npm test
 
 teardown:
 	rm -rf $(VENV_DIR)
-	rm -rf node_modules
-	rm -rf bower_components
-	rm -f bower gulp
 
 # show makefile actions
 help:
