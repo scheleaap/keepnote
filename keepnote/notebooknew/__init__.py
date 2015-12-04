@@ -338,6 +338,8 @@ class NotebookNode(object):
 	NEW = StorageChange('NEW')
 	DELETED = StorageChange('DELETED')
 	CHANGED_TITLE = StorageChange('CHANGED_TITLE')
+	CHANGED_ICON_NORMAL = StorageChange('CHANGED_ICON_NORMAL')
+	CHANGED_ICON_OPEN = StorageChange('CHANGED_ICON_OPEN')
 	CHANGED_MODIFIED_TIME = StorageChange('CHANGED_MODIFIED_TIME')
 	CHANGED_CLIENT_PREFERENCES = StorageChange('CHANGED_CLIENT_PREFERENCES')
 	MOVED = StorageChange('MOVED')
@@ -384,11 +386,11 @@ class NotebookNode(object):
 		self.parent = parent
 		self._title = title
 		self.order = order
-		self.icon_normal = icon_normal
-		self.icon_open = icon_open
+		self._icon_normal = icon_normal
+		self._icon_open = icon_open
 		self.title_color_foreground = title_color_foreground
 		self.title_color_background = title_color_background
-		self._unsaved_changes = []
+		self._unsaved_changes = set()
 		if loaded_from_storage:
 			if node_id is None:
 				raise IllegalArgumentCombinationError()
@@ -405,9 +407,10 @@ class NotebookNode(object):
 			self.node_id = new_node_id()
 			self._created_time = datetime.now(tz=utc)
 			self._modified_time = self._created_time
-			self._unsaved_changes.append(NotebookNode.NEW)
+			self._unsaved_changes.add(NotebookNode.NEW)
 		
 		self.client_preferences = Pref()
+		self.client_preferences.change_listeners.add(self._on_client_preferences_change)
 	
 	def _add_child_node(self, child_node):
 		self._children.append(child_node)
@@ -451,6 +454,36 @@ class NotebookNode(object):
 		raise NotImplementedError('TODO')
 	
 	@property
+	def icon_normal(self):
+		return self._icon_normal
+	
+	@icon_normal.setter
+	def icon_normal(self, icon_normal):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot set the normal icon of a deleted node')
+		
+		self._icon_normal = icon_normal
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(NotebookNode.CHANGED_ICON_NORMAL)
+		
+		self.modified_time = datetime.now(tz=utc)
+	
+	@property
+	def icon_open(self):
+		return self._icon_open
+	
+	@icon_open.setter
+	def icon_open(self, icon_open):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot set the open icon of a deleted node')
+		
+		self._icon_open = icon_open
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(NotebookNode.CHANGED_ICON_OPEN)
+		
+		self.modified_time = datetime.now(tz=utc)
+	
+	@property
 	def is_dirty(self):
 		"""TODO"""
 		raise NotImplementedError('TODO')
@@ -489,6 +522,7 @@ class NotebookNode(object):
 	def modified_time(self):
 		return self._modified_time
 	
+	# TODO: Remove?
 	@modified_time.setter
 	def modified_time(self, modified_time):
 		# TODO: Untested
@@ -497,7 +531,7 @@ class NotebookNode(object):
 		
 		self._modified_time = modified_time
 		if NotebookNode.NEW not in self._unsaved_changes:
-			self._unsaved_changes.append(NotebookNode.CHANGED_MODIFIED_TIME)
+			self._unsaved_changes.add(NotebookNode.CHANGED_MODIFIED_TIME)
 	
 	def move(self, target, behind=None):
 		"""TODO
@@ -531,6 +565,9 @@ class NotebookNode(object):
 	def notebook(self):
 		return self._notebook
 	
+	def _on_client_preferences_change(self):
+		self.modified_time = datetime.now(tz=utc)
+	
 	def _remove_child_node(self, child_node):
 		assert child_node in self._children
 		self._children.remove(child_node)
@@ -550,7 +587,9 @@ class NotebookNode(object):
 		
 		self._title = title
 		if NotebookNode.NEW not in self._unsaved_changes:
-			self._unsaved_changes.append(NotebookNode.CHANGED_TITLE)
+			self._unsaved_changes.add(NotebookNode.CHANGED_TITLE)
+		
+		self.modified_time = datetime.now(tz=utc)
 
 
 class AbstractContentFolderNode(NotebookNode):
@@ -593,7 +632,7 @@ class AbstractContentFolderNode(NotebookNode):
 			self.parent._remove_child_node(self)
 			self._unsaved_changes.remove(NotebookNode.NEW)
 		else:
-			self._unsaved_changes.append(NotebookNode.DELETED)
+			self._unsaved_changes.add(NotebookNode.DELETED)
 	
 	@property
 	def is_dirty(self):
@@ -642,7 +681,9 @@ class AbstractContentFolderNode(NotebookNode):
 				raise IllegalOperationError('Unknown child', e)
 		self.parent._children.remove(self)
 		self.parent = target
-		self._unsaved_changes.append(NotebookNode.MOVED)
+		self._unsaved_changes.add(NotebookNode.MOVED)
+		
+		self.modified_time = datetime.now(tz=utc)
 	
 	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
 #		if additional_payloads is None:
@@ -798,8 +839,10 @@ class ContentNode(AbstractContentFolderNode):
 		
 		self.additional_payload_names.append(payload_name)
 		self._payloads_to_store[payload_name] = payload_data
-		if NotebookNode.NEW not in self._unsaved_changes and ContentNode.PAYLOAD_CHANGE not in self._unsaved_changes:
-			self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
+		
+		self.modified_time = datetime.now(tz=utc)
 	
 	def copy(self, target, with_subtree, behind=None):
 		if self.is_deleted:
@@ -838,6 +881,8 @@ class ContentNode(AbstractContentFolderNode):
 		attributes = {
 				MAIN_PAYLOAD_NAME_ATTRIBUTE.key: self.main_payload_name,
 				TITLE_ATTRIBUTE.key: self._title,
+				ICON_NORMAL_ATTRIBUTE.key: self._icon_normal,
+				ICON_OPEN_ATTRIBUTE.key: self._icon_open,
 				CLIENT_PREFERENCES_ATTRIBUTE.key: self.client_preferences._data,
 				}
 		if self.parent is not None:
@@ -856,10 +901,11 @@ class ContentNode(AbstractContentFolderNode):
 		elif payload_name == self.main_payload_name or payload_name in self.additional_payload_names:
 			self.additional_payload_names.remove(payload_name)
 			self._payload_names_to_remove.append(payload_name)
-			if ContentNode.PAYLOAD_CHANGE not in self._unsaved_changes:
-				self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
+			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
 		else:
 			raise PayloadDoesNotExistError(payload_name)
+		
+		self.modified_time = datetime.now(tz=utc)
 	
 	def save(self):
 		if self.parent is not None and self.parent.is_dirty:
@@ -885,15 +931,16 @@ class ContentNode(AbstractContentFolderNode):
 		else:
 			if NotebookNode.MOVED in self._unsaved_changes or \
 					NotebookNode.CHANGED_TITLE in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_NORMAL in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_OPEN in self._unsaved_changes or \
 					NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes or \
 					self.client_preferences.is_dirty():
 				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
-				if NotebookNode.MOVED in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.MOVED)
-				if NotebookNode.CHANGED_TITLE in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
-				if NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_MODIFIED_TIME)
+				self._unsaved_changes.discard(NotebookNode.MOVED)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_TITLE)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_NORMAL)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_OPEN)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_MODIFIED_TIME)
 				self.client_preferences.reset_dirty()
 			if ContentNode.PAYLOAD_CHANGE in self._unsaved_changes:
 				for payload_name in list(self._payload_names_to_remove):
@@ -909,8 +956,10 @@ class ContentNode(AbstractContentFolderNode):
 		self._payloads_to_store[self.main_payload_name] = payload_data
 		if self.main_payload_name not in self._payload_names_to_remove:
 			self._payload_names_to_remove.append(self.main_payload_name)
-		if NotebookNode.NEW not in self._unsaved_changes and ContentNode.PAYLOAD_CHANGE not in self._unsaved_changes:
-			self._unsaved_changes.append(ContentNode.PAYLOAD_CHANGE)
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
+		
+		self.modified_time = datetime.now(tz=utc)
 
 	def __repr__(self):
 		return '{cls}[{node_id}, {content_type}, {_title}]'.format(
@@ -1002,6 +1051,8 @@ class FolderNode(AbstractContentFolderNode):
 		"""TODO"""
 		attributes = {
 				TITLE_ATTRIBUTE.key: self._title,
+				ICON_NORMAL_ATTRIBUTE.key: self._icon_normal,
+				ICON_OPEN_ATTRIBUTE.key: self._icon_open,
 				CLIENT_PREFERENCES_ATTRIBUTE.key: self.client_preferences._data,
 				}
 		if self.parent is not None:
@@ -1035,15 +1086,16 @@ class FolderNode(AbstractContentFolderNode):
 		else:
 			if NotebookNode.MOVED in self._unsaved_changes or \
 					NotebookNode.CHANGED_TITLE in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_NORMAL in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_OPEN in self._unsaved_changes or \
 					NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes or \
 					self.client_preferences.is_dirty():
 				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
-				if NotebookNode.MOVED in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.MOVED)
-				if NotebookNode.CHANGED_TITLE in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
-				if NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_MODIFIED_TIME)
+				self._unsaved_changes.discard(NotebookNode.MOVED)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_TITLE)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_NORMAL)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_OPEN)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_MODIFIED_TIME)
 				self.client_preferences.reset_dirty()
 	
 	def __repr__(self):
@@ -1192,6 +1244,8 @@ class TrashNode(NotebookNode):
 		"""TODO"""
 		attributes = {
 				TITLE_ATTRIBUTE.key: self._title,
+				ICON_NORMAL_ATTRIBUTE.key: self._icon_normal,
+				ICON_OPEN_ATTRIBUTE.key: self._icon_open,
 				CLIENT_PREFERENCES_ATTRIBUTE.key: self.client_preferences._data,
 				}
 		if self.parent is not None:
@@ -1220,13 +1274,15 @@ class TrashNode(NotebookNode):
 			self.client_preferences.reset_dirty()
 		else:
 			if NotebookNode.CHANGED_TITLE in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_NORMAL in self._unsaved_changes or \
+					NotebookNode.CHANGED_ICON_OPEN in self._unsaved_changes or \
 					NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes or \
 					self.client_preferences.is_dirty():
 				self._notebook_storage.set_node_attributes(self.node_id, self._notebook_storage_attributes)
-				if NotebookNode.CHANGED_TITLE in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_TITLE)
-				if NotebookNode.CHANGED_MODIFIED_TIME in self._unsaved_changes:
-					self._unsaved_changes.remove(NotebookNode.CHANGED_MODIFIED_TIME)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_TITLE)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_NORMAL)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_ICON_OPEN)
+				self._unsaved_changes.discard(NotebookNode.CHANGED_MODIFIED_TIME)
 				self.client_preferences.reset_dirty()
 	
 	def __repr__(self):
