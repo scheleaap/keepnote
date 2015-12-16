@@ -77,6 +77,14 @@ CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID
 TRASH_SN = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payload_names=[])
 
 
+def add_stored_node(notebook_storage, sn):
+	notebook_storage.add_node(
+			node_id=sn.node_id,
+			content_type=sn.content_type,
+			attributes=sn.attributes,
+			payloads=[]
+			)
+
 def datetime_to_timestamp(dt):
 	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
@@ -263,7 +271,23 @@ class NotebookTest(unittest.TestCase):
 		
 		notebook = Notebook(notebook_storage)
 		notebook.get_client_event_listeners("my-event").add(handler.on_event)
+	
+	def test_has_node(self):
+		root = TestNotebookNode()
+		child1 = TestNotebookNode(parent=root, add_to_parent=True)
+		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
+		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
+		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
+		notebook = Notebook()
+		notebook.root = root
 
+		self.assertEqual(True, notebook.has_node(root.node_id))
+		self.assertEqual(True, notebook.has_node(child1.node_id))
+		self.assertEqual(True, notebook.has_node(child11.node_id))
+		self.assertEqual(True, notebook.has_node(child12.node_id))
+		self.assertEqual(True, notebook.has_node(child121.node_id))
+		self.assertEqual(False, notebook.has_node('other_id'))
+		
 
 class ContentFolderTrashNodeTestBase(object):
 	def _create_node(

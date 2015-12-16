@@ -95,7 +95,7 @@ class Notebook(object):
 	@ivar is_dirty: TODO
 	"""
 	
-	def __init__(self, notebook_storage):
+	def __init__(self, notebook_storage=None):
 		"""Constructor.
 		
 		@param notebook_storage: The NotebookStorage to use. 
@@ -126,6 +126,17 @@ class Notebook(object):
 		if key not in self._client_event_listeners:
 			self._client_event_listeners[key] = Listeners()
 		return self._client_event_listeners[key]
+	
+	def has_node(self, node_id, unsaved_deleted=True):
+		"""Returns whether a node exists within the notebook.
+		
+		@param node_id: The id of the node.
+		@return Whether a node exists within the notebook.
+		"""
+		for node in self._traverse_tree():
+			if node.node_id == node_id and (unsaved_deleted == True or (unsaved_deleted == False and not node.is_deleted)):
+				return True
+		return False
 	
 	def _init_from_storage(self):
 		"""Initializes the Notebook from the NotebookStorage."""
@@ -296,7 +307,9 @@ class Notebook(object):
 	
 	def _traverse_tree(self):
 		"""A generator method that yields all NotebookNodes in the notebook."""
-		nodes_to_visit = [self.root]
+		nodes_to_visit = []
+		if self.root is not None:
+			nodes_to_visit.append(self.root)
 		while nodes_to_visit:
 			node = nodes_to_visit.pop()
 			yield node

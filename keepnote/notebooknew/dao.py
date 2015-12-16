@@ -58,17 +58,46 @@ class Dao(object):
 		self._notebook = notebook
 		self._notebook_storage = notebook_storage
 		self._node_daos = node_daos
+		
+		self._last_remote_node_ids = None
+		self._last_local_node_ids = None
 	
 	def sync(self):
 		# Load all remote StoredNodes.
 		remote_sns_by_id = { sn.node_id: sn for sn in self._notebook_storage.get_all_nodes() }
 		
-		# Convert all NotebookNodes to StoredNodes.
-		local_sns_by_id = {}
+		# Load all local NotebookNodes.
+		local_nns_by_id = { nn.node_id: nn for nn in self._notebook._traverse_tree() }
 		
-		new_in_remote = remote_sns_by_id.keys()
+		# Convert all NotebookNodes to StoredNodes.
+# 		local_sns_by_id = {}
+		
+		new_in_remote = []
+		for node_id in remote_sns_by_id.keys():
+			if not self._notebook.has_node(node_id):
+				new_in_remote.append(node_id)
+		
+		new_in_local = []
+		for node_id in local_nns_by_id.keys():
+			if node_id not in remote_sns_by_id:
+				new_in_local.append(node_id)
+		
+		deleted_in_local = [ node_id for (node_id, nn) in local_nns_by_id.iteritems() if nn.is_deleted]
 		
 		self._add_new_in_remote_to_local(remote_sns_by_id, new_in_remote)
+		self._add_new_in_local_to_remote(local_nns_by_id, new_in_local)
+		self._remove_deleted_in_local_from_remote(deleted_in_local)
+	
+	def _add_new_in_local_to_remote(self, nns_by_id, node_ids):
+		for node_id in node_ids:
+			nn = nns_by_id[node_id]
+			sn = self._node_daos[0].nn_to_sn(nn)
+			self._notebook_storage.add_node(
+					node_id=sn.node_id,
+					content_type=sn.content_type,
+					attributes=sn.attributes,
+# 					payloads=sn.payloads)
+					payloads=[])
 	
 	def _add_new_in_remote_to_local(self, sns_by_id, node_ids):
 		# Create NotebookNodes for all StoredNotes and index all StoredNotes and NotebookNodes by id.
@@ -146,6 +175,11 @@ class Dao(object):
 		# Sort children by their id.
 		for stored_node, notebook_node in nns_by_id.values():
 			notebook_node._children.sort(key=lambda child_notebook_node: child_notebook_node.node_id)
+	
+	def _remove_deleted_in_local_from_remote(self, node_ids):
+		for node_id in node_ids:
+			self._notebook_storage.remove_node(node_id)
+
 
 class NotebookNodeDao(object):
 	"""TODO"""

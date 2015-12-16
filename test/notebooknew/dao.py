@@ -66,7 +66,7 @@ CHILD2_SN = StoredNode('child2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATT
 CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payload_names=[])
 TRASH_SN = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payload_names=[])
 
-def _add_node(notebook_storage, sn):
+def add_stored_node(notebook_storage, sn):
 	notebook_storage.add_node(
 			node_id=sn.node_id,
 			content_type=sn.content_type,
@@ -74,12 +74,14 @@ def _add_node(notebook_storage, sn):
 			payloads=[]
 			)
 	
+def datetime_to_timestamp(dt):
+	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
+	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
-class MainTest(object):#unittest.TestCase):
-	def test_structure_only_root(self):
-		"""Test the NotebookNode structure with a just a root."""
+class StructureTest(unittest.TestCase):
+	def test_new_in_remote_only_root(self):
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -91,15 +93,15 @@ class MainTest(object):#unittest.TestCase):
 # 		self.assertEqual(1, len(notebook.root.children))
 # 		self.assertEqual(True, notebook.root.children[0].is_trash)
 		
-	def test_structure_two_levels(self):
+	def test_new_in_remote_two_levels(self):
 		"""Test the NotebookNode structure with a root and direct children."""
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, CHILD1_SN)
-		_add_node(notebook_storage, CHILD2_SN)
-		_add_node(notebook_storage, TRASH_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		add_stored_node(notebook_storage, TRASH_SN)
 		notebook = Notebook(notebook_storage=None)
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
 		
 		dao.sync()
 		
@@ -109,71 +111,21 @@ class MainTest(object):#unittest.TestCase):
 		self.assertEqual((CHILD1_SN.node_id, notebook.root, []), (child1.node_id, child1.parent, [node.node_id for node in child1.children]))
 		self.assertEqual((CHILD2_SN.node_id, notebook.root, []), (child2.node_id, child2.parent, [node.node_id for node in child2.children]))
 	
-	def test_structure_multiple_levels(self):
+	def test_new_in_remote_multiple_levels(self):
 		"""Test the NotebookNode structure with multiple levels of nodes."""
 		self.maxDiff=None
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, CHILD1_SN)
-		_add_node(notebook_storage, CHILD11_SN)
-		_add_node(notebook_storage, CHILD12_SN)
-		_add_node(notebook_storage, CHILD121_SN)
-		_add_node(notebook_storage, CHILD2_SN)
-		_add_node(notebook_storage, CHILD21_SN)
-		_add_node(notebook_storage, TRASH_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, CHILD11_SN)
+		add_stored_node(notebook_storage, CHILD12_SN)
+		add_stored_node(notebook_storage, CHILD121_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		add_stored_node(notebook_storage, CHILD21_SN)
+		add_stored_node(notebook_storage, TRASH_SN)
 		notebook = Notebook(notebook_storage=None)
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
-		
-		dao.sync()
-		
-		child1 = notebook.root.children[0]
-		child11 = notebook.root.children[0].children[0]
-		child12 = notebook.root.children[0].children[1]
-		child121 = notebook.root.children[0].children[1].children[0]
-		child2 = notebook.root.children[1]
-		child21 = notebook.root.children[1].children[0]
-
-		# Verify the ID's.
-		self.assertEqual(CHILD1_SN.node_id, child1.node_id)
-		self.assertEqual(CHILD11_SN.node_id, child11.node_id)
-		self.assertEqual(CHILD12_SN.node_id, child12.node_id)
-		self.assertEqual(CHILD121_SN.node_id, child121.node_id)
-		self.assertEqual(CHILD2_SN.node_id, child2.node_id)
-		self.assertEqual(CHILD21_SN.node_id, child21.node_id)
-		
-		# Verify the children. 
-		self.assertEqual([CHILD11_SN.node_id, CHILD12_SN.node_id], [node.node_id for node in child1.children])
-		self.assertEqual([], [node.node_id for node in child11.children])
-		self.assertEqual([CHILD121_SN.node_id], [node.node_id for node in child12.children])
-		self.assertEqual([CHILD21_SN.node_id], [node.node_id for node in child2.children])
-		self.assertEqual([], [node.node_id for node in child21.children])
-		
-		# Verify the parents. 
-		self.assertEqual(notebook.root, child1.parent)
-		self.assertEqual(child1, child11.parent)
-		self.assertEqual(child1, child12.parent)
-		self.assertEqual(child12, child121.parent)
-		self.assertEqual(notebook.root, child2.parent)
-		self.assertEqual(child2, child21.parent)
-		
-	def test_structure_stored_nodes_postordered(self):
-		"""Test the NotebookNode structure with multiple levels of nodes, if the backing NotebookStorage.get_all_nodes()
-		returns the StoredNotes in another order. In this case, the order achieved when traversing the tree depth-first
-		left-to-right post-order."""
-		self.maxDiff=None
-		
-		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, TRASH_SN)
-		_add_node(notebook_storage, CHILD21_SN)
-		_add_node(notebook_storage, CHILD2_SN)
-		_add_node(notebook_storage, CHILD121_SN)
-		_add_node(notebook_storage, CHILD12_SN)
-		_add_node(notebook_storage, CHILD11_SN)
-		_add_node(notebook_storage, CHILD1_SN)
-		_add_node(notebook_storage, ROOT_SN)
-		notebook = Notebook(notebook_storage=None)
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
 		
 		dao.sync()
 		
@@ -207,14 +159,98 @@ class MainTest(object):#unittest.TestCase):
 		self.assertEqual(notebook.root, child2.parent)
 		self.assertEqual(child2, child21.parent)
 	
-	def test_validation_two_roots(self):
-		"""Test a NotebookStorage with two roots."""
-		root1_sn = StoredNode('root1_id', CONTENT_TYPE_FOLDER, attributes={}, payload_names=[])
-		root2_sn = StoredNode('root2_id', CONTENT_TYPE_FOLDER, attributes={}, payload_names=[])
+	def test_new_in_remote_stored_nodes_postordered(self):
+		"""Test the NotebookNode structure with multiple levels of nodes, if the backing NotebookStorage.get_all_nodes()
+		returns the StoredNotes in another order. In this case, the order achieved when traversing the tree depth-first
+		left-to-right post-order."""
+		self.maxDiff=None
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, root1_sn)
-		_add_node(notebook_storage, root2_sn)
+		add_stored_node(notebook_storage, TRASH_SN)
+		add_stored_node(notebook_storage, CHILD21_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		add_stored_node(notebook_storage, CHILD121_SN)
+		add_stored_node(notebook_storage, CHILD12_SN)
+		add_stored_node(notebook_storage, CHILD11_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
+		notebook = Notebook(notebook_storage=None)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
+		
+		dao.sync()
+		
+		child1 = notebook.root.children[0]
+		child11 = notebook.root.children[0].children[0]
+		child12 = notebook.root.children[0].children[1]
+		child121 = notebook.root.children[0].children[1].children[0]
+		child2 = notebook.root.children[1]
+		child21 = notebook.root.children[1].children[0]
+
+		# Verify the ID's.
+		self.assertEqual(CHILD1_SN.node_id, child1.node_id)
+		self.assertEqual(CHILD11_SN.node_id, child11.node_id)
+		self.assertEqual(CHILD12_SN.node_id, child12.node_id)
+		self.assertEqual(CHILD121_SN.node_id, child121.node_id)
+		self.assertEqual(CHILD2_SN.node_id, child2.node_id)
+		self.assertEqual(CHILD21_SN.node_id, child21.node_id)
+		
+		# Verify the children. 
+		self.assertEqual([CHILD11_SN.node_id, CHILD12_SN.node_id], [node.node_id for node in child1.children])
+		self.assertEqual([], [node.node_id for node in child11.children])
+		self.assertEqual([CHILD121_SN.node_id], [node.node_id for node in child12.children])
+		self.assertEqual([CHILD21_SN.node_id], [node.node_id for node in child2.children])
+		self.assertEqual([], [node.node_id for node in child21.children])
+		
+		# Verify the parents. 
+		self.assertEqual(notebook.root, child1.parent)
+		self.assertEqual(child1, child11.parent)
+		self.assertEqual(child1, child12.parent)
+		self.assertEqual(child12, child121.parent)
+		self.assertEqual(notebook.root, child2.parent)
+		self.assertEqual(child2, child21.parent)
+	
+	def test_new_in_remote_sync_twice(self):
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, CHILD11_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		add_stored_node(notebook_storage, TRASH_SN)
+		notebook = Notebook(notebook_storage=None)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
+		
+		dao.sync()
+		
+		old_root = notebook.root
+		old_child1 = notebook.root.children[0]
+		old_child11 = notebook.root.children[0].children[0]
+		old_child2 = notebook.root.children[1]
+
+		self.assertEquals(3, len(old_root.children))
+		
+		dao.sync()
+
+		new_root = notebook.root
+		new_child1 = notebook.root.children[0]
+		new_child11 = notebook.root.children[0].children[0]
+		new_child2 = notebook.root.children[1]
+		
+		self.assertEquals(True, old_root is new_root)
+		self.assertEquals(True, old_child1 is new_child1)
+		self.assertEquals(True, old_child11 is new_child11)
+		self.assertEquals(True, old_child2 is new_child2)
+
+		self.assertEquals(3, len(new_root.children))
+		
+	
+	def test_validation_two_roots(self):
+		"""Test a NotebookStorage with two roots."""
+		root1_sn = StoredNode('root1_id', CONTENT_TYPE_TEST, attributes={}, payload_names=[])
+		root2_sn = StoredNode('root2_id', CONTENT_TYPE_TEST, attributes={}, payload_names=[])
+		
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_stored_node(notebook_storage, root1_sn)
+		add_stored_node(notebook_storage, root2_sn)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -223,11 +259,11 @@ class MainTest(object):#unittest.TestCase):
 	
 	def test_validation_unknown_parent(self):
 		"""Test a NotebookStorage with a root and a node that references an unknown parent."""
-		child_sn = StoredNode('child_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'unknown_id'}, payload_names=[])
+		child_sn = StoredNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'unknown_id'}, payload_names=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, child_sn)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, child_sn)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -236,11 +272,11 @@ class MainTest(object):#unittest.TestCase):
 	
 	def test_validation_parent_is_node_a_child(self):
 		"""Test a NotebookStorage with a root and a node that is its own parent."""
-		child_sn = StoredNode('child_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payload_names=[])
+		child_sn = StoredNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payload_names=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, child_sn)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, child_sn)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -249,12 +285,12 @@ class MainTest(object):#unittest.TestCase):
 	
 	def test_validation_cycle_no_root(self):
 		"""Test a NotebookStorage with a cycle and no root."""
-		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
-		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
+		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
+		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, cycle_node1_sn)
-		_add_node(notebook_storage, cycle_node2_sn)
+		add_stored_node(notebook_storage, cycle_node1_sn)
+		add_stored_node(notebook_storage, cycle_node2_sn)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -263,16 +299,16 @@ class MainTest(object):#unittest.TestCase):
 	
 	def test_validation_cycle_with_root(self):
 		"""Test a NotebookStorage with a root and a cycle."""
-		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node3_id'}, payload_names=[])
-		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
-		cycle_node3_sn = StoredNode('cycle_node3_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
+		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node3_id'}, payload_names=[])
+		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
+		cycle_node3_sn = StoredNode('cycle_node3_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, CHILD1_SN)
-		_add_node(notebook_storage, cycle_node1_sn)
-		_add_node(notebook_storage, cycle_node2_sn)
-		_add_node(notebook_storage, cycle_node3_sn)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, cycle_node1_sn)
+		add_stored_node(notebook_storage, cycle_node2_sn)
+		add_stored_node(notebook_storage, cycle_node3_sn)
 		notebook = Notebook(notebook_storage=None)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		
@@ -285,21 +321,118 @@ class MainTest(object):#unittest.TestCase):
 		trash2_sn = StoredNode('trash2_id', CONTENT_TYPE_TRASH, attributes={}, payload_names=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
-		_add_node(notebook_storage, trash1_sn)
-		_add_node(notebook_storage, trash2_sn)
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, trash1_sn)
+		add_stored_node(notebook_storage, trash2_sn)
 		notebook = Notebook(notebook_storage=None)
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
 		
 		with self.assertRaises(InvalidStructureError):
 			dao.sync()
 
+	def test_new_in_local_only_root(self):
+		root_nn = TestNotebookNode()
+		notebook = Notebook()
+		notebook.root = root_nn
+		notebook_storage = storage.mem.InMemoryStorage()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
+
+		dao.sync()
+		
+		self.assertEqual(1, len(list(notebook_storage.get_all_nodes())))
+		
+		root_sn = notebook_storage.get_node(root_nn.node_id)
+		self.assertEqual(False, PARENT_ID_ATTRIBUTE in root_sn.attributes)
+	
+	def test_new_in_local_multiple_levels(self):
+		root_nn = TestNotebookNode()
+		child1_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
+		child11_nn = TestNotebookNode(parent=child1_nn, add_to_parent=True)
+		child12_nn = TestNotebookNode(parent=child1_nn, add_to_parent=True)
+		child121_nn = TestNotebookNode(parent=child12_nn, add_to_parent=True)
+		child2_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
+		child21_nn = TestNotebookNode(parent=child2_nn, add_to_parent=True)
+		notebook = Notebook()
+		notebook.root = root_nn
+		notebook_storage = storage.mem.InMemoryStorage()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
+
+		dao.sync()
+		
+		self.assertEqual(7, len(list(notebook_storage.get_all_nodes())))
+		
+		root_sn = notebook_storage.get_node(root_nn.node_id)
+		child1_sn = notebook_storage.get_node(child1_nn.node_id)
+		child11_sn = notebook_storage.get_node(child11_nn.node_id)
+		child12_sn = notebook_storage.get_node(child12_nn.node_id)
+		child121_sn = notebook_storage.get_node(child121_nn.node_id)
+		child2_sn = notebook_storage.get_node(child2_nn.node_id)
+		child21_sn = notebook_storage.get_node(child21_nn.node_id)
+
+		self.assertEqual(False, PARENT_ID_ATTRIBUTE in root_sn.attributes)
+		self.assertEqual(root_nn.node_id, child1_sn.attributes[PARENT_ID_ATTRIBUTE])
+		self.assertEqual(child1_nn.node_id, child11_sn.attributes[PARENT_ID_ATTRIBUTE])
+		self.assertEqual(child1_nn.node_id, child12_sn.attributes[PARENT_ID_ATTRIBUTE])
+		self.assertEqual(child12_nn.node_id, child121_sn.attributes[PARENT_ID_ATTRIBUTE])
+		self.assertEqual(root_nn.node_id, child2_sn.attributes[PARENT_ID_ATTRIBUTE])
+		self.assertEqual(child2_nn.node_id, child21_sn.attributes[PARENT_ID_ATTRIBUTE])
+	
+	def test_new_in_local_sync_twice(self):
+		root_nn = TestNotebookNode()
+		child1_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
+		_child11_nn = TestNotebookNode(parent=child1_nn, add_to_parent=True)
+		_child2_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
+		notebook = Notebook()
+		notebook.root = root_nn
+		notebook_storage = storage.mem.InMemoryStorage()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
+		dao.sync()
+		
+		dao.sync()
+		
+		self.assertEqual(4, len(list(notebook_storage.get_all_nodes())))
+	
+	def test_deleted_in_local(self):
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		notebook = Notebook(notebook_storage=None)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao()])
+		dao.sync()
+		self.assertEqual(3, len(list(notebook_storage.get_all_nodes())))
+		child2 = [child for child in notebook.root.get_children() if child.node_id == CHILD2_SN.node_id][0]
+		child2.delete()
+		
+		dao.sync()
+		
+		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
+		self.assertEqual(False, notebook_storage.has_node(CHILD2_SN.node_id))
+		self.assertEqual(False, notebook.has_node(CHILD2_SN.node_id, unsaved_deleted=False))
+	
+	@unittest.skip('TODO')
+	def test_deleted_in_remote(self):
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_stored_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, CHILD1_SN)
+		add_stored_node(notebook_storage, CHILD2_SN)
+		notebook = Notebook(notebook_storage=None)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao()])
+		dao.sync()
+		self.assertEqual(3, len(list(notebook._traverse_tree())))
+		notebook_storage.remove_node(CHILD2_SN.node_id)
+		
+		dao.sync()
+		
+		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
+		self.assertEqual(False, notebook_storage.has_node(CHILD2_SN.node_id))
+		self.assertEqual(False, notebook.has_node(CHILD2_SN.node_id))
 
 class ContentNodeTest(unittest.TestCase):
 	def test_load_content_node(self):
 		"""Test loading a content node."""
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_HTML,
@@ -424,7 +557,7 @@ class FolderNodeTest(unittest.TestCase):
 		"""Test loading a folder node."""
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_FOLDER,
@@ -465,7 +598,7 @@ class FolderNodeTest(unittest.TestCase):
 		"""Test loading a folder node without a title."""
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_FOLDER,
@@ -489,7 +622,7 @@ class TrashNodeTest(unittest.TestCase):
 		"""Test loading a trash node."""
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_TRASH,
@@ -531,7 +664,7 @@ class TrashNodeTest(unittest.TestCase):
 		"""Test loading a trash node without a title."""
 		
 		notebook_storage = storage.mem.InMemoryStorage()
-		_add_node(notebook_storage, ROOT_SN)
+		add_stored_node(notebook_storage, ROOT_SN)
 		notebook_storage.add_node(
 				node_id=DEFAULT_ID,
 				content_type=CONTENT_TYPE_TRASH,
@@ -553,6 +686,22 @@ class TrashNodeTest(unittest.TestCase):
 class TestNotebookNodeDao(NotebookNodeDao):
 	def accepts(self, content_type):
 		return content_type == CONTENT_TYPE_TEST
+	
+	def nn_to_sn(self, nn):
+		attributes = {
+				TITLE_ATTRIBUTE: nn.title,
+# 				ICON_NORMAL_ATTRIBUTE: nn.icon_normal,
+# 				ICON_OPEN_ATTRIBUTE: nn.icon_open,
+# 				CLIENT_PREFERENCES_ATTRIBUTE: self.client_preferences._data,
+				}
+		if nn.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = nn.parent.node_id
+# 		if nn.created_time is not None:
+# 			attributes[CREATED_TIME_ATTRIBUTE] = datetime_to_timestamp(nn.created_time)
+# 		if nn.modified_time is not None:
+# 			attributes[MODIFIED_TIME_ATTRIBUTE] = datetime_to_timestamp(nn.modified_time)
+		
+		return StoredNode(nn.node_id, nn.content_type, attributes, [])
 	
 	def sn_to_nn(self, sn, notebook_storage, notebook):
 		return TestNotebookNode(
@@ -596,6 +745,18 @@ class TestNotebookNode(NotebookNode):
 				raise IllegalOperationError('Please pass add_to_parent')
 			elif add_to_parent == True:
 				self.parent._add_child_node(self)
+	
+	def delete(self):
+		if self.parent is None:
+			raise IllegalOperationError('Cannot delete the root node')
+		for child in self._children:
+			child.delete()
+		self.is_deleted = True
+		if NotebookNode.NEW in self._unsaved_changes:
+			self.parent._remove_child_node(self)
+			self._unsaved_changes.remove(NotebookNode.NEW)
+		else:
+			self._unsaved_changes.add(NotebookNode.DELETED)
 	
 	@property
 	def is_dirty(self):

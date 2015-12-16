@@ -1,3 +1,6 @@
 Do something more intelligent in the test_validation_*() methods
 Create root node after first sync
 Create trash on first delete
+Implement payload hash in NotebookStorage
+Implement saving
+Implement test_deleted_in_remote()
