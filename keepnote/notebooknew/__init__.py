@@ -22,6 +22,7 @@ __all__ = [
 		'IllegalArgumentCombinationError',
 		'IllegalOperationError',
 		'InvalidStructureError',
+		'NodeDoesNotExistError',
 		'PayloadAlreadyExistsError',
 		'PayloadDoesNotExistError'
 		]
@@ -126,6 +127,18 @@ class Notebook(object):
 		if key not in self._client_event_listeners:
 			self._client_event_listeners[key] = Listeners()
 		return self._client_event_listeners[key]
+	
+	def get_node_by_id(self, node_id):
+		"""Returns a node from the notebook.
+		
+		@param node_id: The id of the node.
+		@return A NotebookNode.
+		@raise NodeDoesNotExistError: If a node with the id does not exist.
+		"""
+		for node in self._traverse_tree():
+			if node.node_id == node_id:
+				return node
+		raise NodeDoesNotExistError(node_id)
 	
 	def has_node(self, node_id, unsaved_deleted=True):
 		"""Returns whether a node exists within the notebook.
@@ -1320,6 +1333,10 @@ class IllegalOperationError(NotebookError):
 
 
 class InvalidStructureError(NotebookError):
+	pass
+
+
+class NodeDoesNotExistError(NotebookError):
 	pass
 
 

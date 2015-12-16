@@ -183,40 +183,6 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
 	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_with_changes1(self):
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(TRASH_SN.node_id, TRASH_SN.content_type, TRASH_SN.attributes, [])
-		notebook_storage.add_node(CHILD1_SN.node_id, CHILD1_SN.content_type, CHILD1_SN.attributes, [])
-		notebook = Notebook(notebook_storage)
-		child1 = [child for child in notebook.root.children if child.node_id == CHILD1_SN.node_id][0]
-		child11 = child1.new_folder_child_node(DEFAULT_TITLE)
-		_child111 = child11.new_folder_child_node(DEFAULT_TITLE)
-		
-		self.assertEqual(True, notebook.is_dirty)
-		notebook.save()
-		
-		self.assertEqual(5, len(list(notebook_storage.get_all_nodes())))
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_with_changes2(self):
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(TRASH_SN.node_id, TRASH_SN.content_type, TRASH_SN.attributes, [])
-		notebook_storage.add_node(CHILD1_SN.node_id, CHILD1_SN.content_type, CHILD1_SN.attributes, [])
-		notebook_storage.add_node(CHILD11_SN.node_id, CHILD11_SN.content_type, CHILD11_SN.attributes, [])
-		notebook = Notebook(notebook_storage)
-		child1 = [child for child in notebook.root.children if child.node_id == CHILD1_SN.node_id][0]
-		_child11 = [child for child in child1.children if child.node_id == CHILD11_SN.node_id][0]
-		child1.delete()
-		
-		self.assertEqual(True, notebook.is_dirty)
-		notebook.save()
-		
-		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
-
-	@unittest.skip('TODO: MIGRATE')
 	def test_close_without_changes(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
@@ -287,6 +253,23 @@ class NotebookTest(unittest.TestCase):
 		self.assertEqual(True, notebook.has_node(child12.node_id))
 		self.assertEqual(True, notebook.has_node(child121.node_id))
 		self.assertEqual(False, notebook.has_node('other_id'))
+	
+	def test_find_node_by_id(self):
+		root = TestNotebookNode()
+		child1 = TestNotebookNode(parent=root, add_to_parent=True)
+		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
+		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
+		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
+		notebook = Notebook()
+		notebook.root = root
+
+		self.assertEqual(root, notebook.get_node_by_id(root.node_id))
+		self.assertEqual(child1, notebook.get_node_by_id(child1.node_id))
+		self.assertEqual(child11, notebook.get_node_by_id(child11.node_id))
+		self.assertEqual(child12, notebook.get_node_by_id(child12.node_id))
+		self.assertEqual(child121, notebook.get_node_by_id(child121.node_id))
+		with self.assertRaises(NodeDoesNotExistError):
+			notebook.get_node_by_id('other_id')
 		
 
 class ContentFolderTrashNodeTestBase(object):
@@ -464,8 +447,8 @@ class ContentFolderTrashNodeTestBase(object):
 		
 		self.assertEqual(False, node.is_node_a_child(other_node))
 	
-	def test_title_init_set_and_save_new(self):
-		"""Tests setting and saving the title of a new node."""
+	def test_title_init_set_new(self):
+		"""Tests setting the title of a new node."""
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		node = self._create_node(notebook_storage=notebook_storage, title=DEFAULT_TITLE, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_TITLE, node.title)
@@ -494,8 +477,8 @@ class ContentFolderTrashNodeTestBase(object):
 		node.save()
 		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
-	def test_title_init_set_and_save_from_storage(self):
-		"""Tests setting and saving the title of a node loaded from storage."""
+	def test_title_init_set_from_storage(self):
+		"""Tests setting the title of a node loaded from storage."""
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		node = self._create_node(notebook_storage=notebook_storage, title=DEFAULT_TITLE, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_TITLE, node.title)
@@ -520,8 +503,8 @@ class ContentFolderTrashNodeTestBase(object):
 		node.save()
 		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
-	def test_created_time_init_and_save_new(self):
-		"""Tests saving the created time of a new node."""
+	def test_created_time_init_new(self):
+		"""Tests the created time of a new node."""
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		node = self._create_node(notebook_storage=notebook_storage, loaded_from_storage=False)
 		self.assertEqual(utc, node.created_time.tzinfo)
@@ -550,8 +533,8 @@ class ContentFolderTrashNodeTestBase(object):
 		node.save()
 		self.assertEqual(False, notebook_storage.set_node_attributes.called)
 	
-	def test_created_time_init_and_save_from_storage(self):
-		"""Tests saving the created time of a node loaded from storage."""
+	def test_created_time_init_from_storage(self):
+		"""Tests the created time of a node loaded from storage."""
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		node = self._create_node(notebook_storage=notebook_storage, created_time=DEFAULT_CREATED_TIME, loaded_from_storage=True)
 		self.assertEqual(utc, node.created_time.tzinfo)
