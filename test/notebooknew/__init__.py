@@ -82,6 +82,7 @@ def datetime_to_timestamp(dt):
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
 class NotebookTest(unittest.TestCase):
+	@unittest.skip('TODO: MIGRATE')
 	def test_load_notebook(self):
 		"""Test loading a notebook."""
 		
@@ -96,459 +97,7 @@ class NotebookTest(unittest.TestCase):
 		# Verify the Notebook.
 		self.assertEqual(False, notebook.is_dirty)
 	
-	def test_load_content_node(self):
-		"""Test loading a content node."""
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
-						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
-						ORDER_ATTRIBUTE: DEFAULT_ORDER,
-						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
-						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
-						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
-						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
-						},
-				payloads=[
-						(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)),
-						(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))
-						]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = [child for child in notebook.root.get_children() if child.node_id == DEFAULT_ID][0]
-		self.assertEqual(ContentNode, node.__class__)
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(CONTENT_TYPE_HTML, node.content_type)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
-		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
-		self.assertEqual(False, node.is_dirty)
-	
-	def test_load_content_node_missing_title(self):
-		"""Test loading a content node without a title."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.root
-		self.assertIsNotNone(node.title)
-	
-	def test_load_content_node_missing_payload(self):
-		"""Test loading a content node without payload."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						},
-				payloads=[]
-				)
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_load_content_node_missing_main_payload_name(self):
-		"""Test loading a content node without payload."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
-				)
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_load_content_node_missing_main_payload_data(self):
-		"""Test loading a content node without payload."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						},
-				payloads=[(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))]
-				)
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_load_folder_node(self):
-		"""Test loading a folder node."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_FOLDER,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
-						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
-						ORDER_ATTRIBUTE: DEFAULT_ORDER,
-						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
-						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
-						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
-						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
-						},
-				payloads=[]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = [child for child in notebook.root.get_children() if child.node_id == DEFAULT_ID][0]
-		self.assertEqual(FolderNode, node.__class__)
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(CONTENT_TYPE_FOLDER, node.content_type)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(False, node.is_dirty)
-	
-	def test_load_folder_node_missing_title(self):
-		"""Test loading a folder node without a title."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_FOLDER,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						},
-				payloads=[]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.root
-		self.assertIsNotNone(node.title)	
-	
-	def test_load_trash_node(self):
-		"""Test loading a trash node."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_TRASH,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						TITLE_ATTRIBUTE: DEFAULT_TITLE,
-						CREATED_TIME_ATTRIBUTE: DEFAULT_CREATED_TIMESTAMP,
-						MODIFIED_TIME_ATTRIBUTE: DEFAULT_MODIFIED_TIMESTAMP,
-						ORDER_ATTRIBUTE: DEFAULT_ORDER,
-						ICON_NORMAL_ATTRIBUTE: DEFAULT_ICON_NORMAL,
-						ICON_OPEN_ATTRIBUTE: DEFAULT_ICON_OPEN,
-						TITLE_COLOR_FOREGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_FOREGROUND,
-						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
-						},
-				payloads=[]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.trash
-		self.assertEqual([child for child in notebook.root.children if child.node_id == DEFAULT_ID][0], node)
-		self.assertEqual(TrashNode, node.__class__)
-		self.assertEqual(DEFAULT_ID, node.node_id)
-		self.assertEqual(CONTENT_TYPE_TRASH, node.content_type)
-		self.assertEqual(DEFAULT_TITLE, node.title)
-		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
-		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
-		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
-		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
-		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
-		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
-		self.assertEqual(False, node.is_dirty)
-	
-	def test_load_trash_node_missing_title(self):
-		"""Test loading a trash node without a title."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_TRASH,
-				attributes={
-						PARENT_ID_ATTRIBUTE: ROOT_SN.node_id,
-						},
-				payloads=[]
-				)
-		
-		# Initialize Notebook with the NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.root
-		self.assertIsNotNone(node.title)	
-	
-	def test_structure_only_root(self):
-		"""Test the NotebookNode structure with a just a root."""
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify notebook.root.
-		self.assertEqual(ROOT_SN.node_id, notebook.root.node_id)
-		self.assertEqual(None, notebook.root.parent)
-		self.assertEqual(1, len(notebook.root.children))
-		self.assertEqual(True, notebook.root.children[0].is_trash)
-		
-	def test_structure_two_levels(self):
-		"""Test the NotebookNode structure with a root and direct children."""
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, CHILD1_SN, CHILD2_SN, TRASH_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the structure.
-		child1 = notebook.root.children[0]
-		child2 = notebook.root.children[1]
-		self.assertEqual((CHILD1_SN.node_id, notebook.root, []), (child1.node_id, child1.parent, [node.node_id for node in child1.children]))
-		self.assertEqual((CHILD2_SN.node_id, notebook.root, []), (child2.node_id, child2.parent, [node.node_id for node in child2.children]))
-		
-	def test_structure_multiple_levels(self):
-		"""Test the NotebookNode structure with multiple levels of nodes."""
-		self.maxDiff=None
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, CHILD1_SN, CHILD11_SN, CHILD12_SN, CHILD121_SN, CHILD2_SN, CHILD21_SN, TRASH_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		child1 = notebook.root.children[0]
-		child11 = notebook.root.children[0].children[0]
-		child12 = notebook.root.children[0].children[1]
-		child121 = notebook.root.children[0].children[1].children[0]
-		child2 = notebook.root.children[1]
-		child21 = notebook.root.children[1].children[0]
-
-		# Verify the ID's.
-		self.assertEqual(CHILD1_SN.node_id, child1.node_id)
-		self.assertEqual(CHILD11_SN.node_id, child11.node_id)
-		self.assertEqual(CHILD12_SN.node_id, child12.node_id)
-		self.assertEqual(CHILD121_SN.node_id, child121.node_id)
-		self.assertEqual(CHILD2_SN.node_id, child2.node_id)
-		self.assertEqual(CHILD21_SN.node_id, child21.node_id)
-		
-		# Verify the children. 
-		self.assertEqual([CHILD11_SN.node_id, CHILD12_SN.node_id], [node.node_id for node in child1.children])
-		self.assertEqual([], [node.node_id for node in child11.children])
-		self.assertEqual([CHILD121_SN.node_id], [node.node_id for node in child12.children])
-		self.assertEqual([CHILD21_SN.node_id], [node.node_id for node in child2.children])
-		self.assertEqual([], [node.node_id for node in child21.children])
-		
-		# Verify the parents. 
-		self.assertEqual(notebook.root, child1.parent)
-		self.assertEqual(child1, child11.parent)
-		self.assertEqual(child1, child12.parent)
-		self.assertEqual(child12, child121.parent)
-		self.assertEqual(notebook.root, child2.parent)
-		self.assertEqual(child2, child21.parent)
-		
-	def test_structure_stored_nodes_postordered(self):
-		"""Test the NotebookNode structure with multiple levels of nodes, if the backing NotebookStorage.get_all_nodes()
-		returns the StoredNotes in another order. In this case, the order achieved when traversing the tree depth-first
-		left-to-right post-order."""
-		self.maxDiff=None
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [TRASH_SN, CHILD11_SN, CHILD121_SN, CHILD12_SN, CHILD1_SN, CHILD21_SN, CHILD2_SN, ROOT_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		child1 = notebook.root.children[0]
-		child11 = notebook.root.children[0].children[0]
-		child12 = notebook.root.children[0].children[1]
-		child121 = notebook.root.children[0].children[1].children[0]
-		child2 = notebook.root.children[1]
-		child21 = notebook.root.children[1].children[0]
-
-		# Verify the ID's.
-		self.assertEqual(CHILD1_SN.node_id, child1.node_id)
-		self.assertEqual(CHILD11_SN.node_id, child11.node_id)
-		self.assertEqual(CHILD12_SN.node_id, child12.node_id)
-		self.assertEqual(CHILD121_SN.node_id, child121.node_id)
-		self.assertEqual(CHILD2_SN.node_id, child2.node_id)
-		self.assertEqual(CHILD21_SN.node_id, child21.node_id)
-		
-		# Verify the children. 
-		self.assertEqual([CHILD11_SN.node_id, CHILD12_SN.node_id], [node.node_id for node in child1.children])
-		self.assertEqual([], [node.node_id for node in child11.children])
-		self.assertEqual([CHILD121_SN.node_id], [node.node_id for node in child12.children])
-		self.assertEqual([CHILD21_SN.node_id], [node.node_id for node in child2.children])
-		self.assertEqual([], [node.node_id for node in child21.children])
-		
-		# Verify the parents. 
-		self.assertEqual(notebook.root, child1.parent)
-		self.assertEqual(child1, child11.parent)
-		self.assertEqual(child1, child12.parent)
-		self.assertEqual(child12, child121.parent)
-		self.assertEqual(notebook.root, child2.parent)
-		self.assertEqual(child2, child21.parent)
-		
-	def test_validation_two_roots(self):
-		"""Test a NotebookStorage with two roots."""
-		root1_sn = StoredNode('root1_id', CONTENT_TYPE_FOLDER, attributes={}, payload_names=[])
-		root2_sn = StoredNode('root2_id', CONTENT_TYPE_FOLDER, attributes={}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [root1_sn, root2_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_validation_unknown_parent(self):
-		"""Test a NotebookStorage with a root and a node that references an unknown parent."""
-		child_sn = StoredNode('child_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'unknown_id'}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, child_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_validation_parent_is_node_a_child(self):
-		"""Test a NotebookStorage with a root and a node that is its own parent."""
-		child_sn = StoredNode('child_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, child_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_validation_cycle_no_root(self):
-		"""Test a NotebookStorage with a cycle and no root."""
-		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
-		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [cycle_node1_sn, cycle_node2_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_validation_cycle_with_root(self):
-		"""Test a NotebookStorage with a root and a cycle."""
-		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node3_id'}, payload_names=[])
-		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payload_names=[])
-		cycle_node3_sn = StoredNode('cycle_node3_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, CHILD1_SN, cycle_node1_sn, cycle_node2_sn, cycle_node3_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	# TODO: Is this really necessary?
-	def test_validation_trash_not_child_of_root(self):
-		"""Test a NotebookStorage with a trash that is not a child of the root node."""
-		trash_sn = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: CHILD1_SN.node_id}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, CHILD1_SN, trash_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
-	def test_validation_two_trashes(self):
-		"""Test a NotebookStorage with two trashes."""
-		trash1_sn = StoredNode('trash1_id', CONTENT_TYPE_TRASH, attributes={}, payload_names=[])
-		trash2_sn = StoredNode('trash2_id', CONTENT_TYPE_TRASH, attributes={}, payload_names=[])
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, trash1_sn, trash2_sn]
-		
-		with self.assertRaises(InvalidStructureError):
-			# Initialize Notebook with the mocked NotebookStorage.
-			Notebook(notebook_storage)
-	
+	@unittest.skip('TODO: MIGRATE')
 	def test_root_created_in_empty_storage(self):
 		"""Test if a root is created if the NotebookStorage is empty."""
 		
@@ -570,6 +119,7 @@ class NotebookTest(unittest.TestCase):
 		# Verify the storage.
 		self.assertEqual(False, notebook_storage.add_node.called)
 	
+	@unittest.skip('TODO: MIGRATE')
 	def test_trash_created_if_missing(self):
 		"""Test if a trash is created in a NotebookStorage without one."""
 		
@@ -613,6 +163,7 @@ class NotebookTest(unittest.TestCase):
 		expected.set('test', 'key', 'value')
 		self.assertEqual(expected, notebook.client_preferences)
 	
+	@unittest.skip('TODO: MIGRATE')
 	def test_save_without_changes(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
@@ -624,6 +175,7 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
 	
+	@unittest.skip('TODO: MIGRATE')
 	def test_save_with_changes1(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
@@ -639,6 +191,7 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(5, len(list(notebook_storage.get_all_nodes())))
 	
+	@unittest.skip('TODO: MIGRATE')
 	def test_save_with_changes2(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
@@ -655,6 +208,7 @@ class NotebookTest(unittest.TestCase):
 		
 		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
 
+	@unittest.skip('TODO: MIGRATE')
 	def test_close_without_changes(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
@@ -669,6 +223,7 @@ class NotebookTest(unittest.TestCase):
 		handler.assert_has_calls([call.on_closing(), call.on_close()])
 	
 	# TODO: Consider making the desktop client responsible for saving before closing.
+	@unittest.skip('TODO: MIGRATE')
 	def test_close_with_changes(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = [ROOT_SN, TRASH_SN]
@@ -690,7 +245,7 @@ class NotebookTest(unittest.TestCase):
 				call.handler.on_close()
 				])
 	
-	@unittest.skip("TODO")
+	@unittest.skip('TODO')
 	def test_node_changed_event(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
@@ -699,7 +254,7 @@ class NotebookTest(unittest.TestCase):
 		notebook = Notebook(notebook_storage)
 		notebook.node_changed_listeners.add(handler.on_node_change)
 		
-		self.fail("TODO");
+		self.fail('TODO');
 	
 	def get_client_event_listeners(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
@@ -3564,4 +3119,3 @@ class TestNotebookNode(NotebookNode):
 	
 	def set_is_in_trash(self, value):
 		self._is_in_trash = value
-	

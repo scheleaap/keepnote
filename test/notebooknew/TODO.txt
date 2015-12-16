@@ -33,7 +33,6 @@ x	has_children()
 -	get_parent()
 -	get_notebook()
 
-TODO: HIER BEZIG:
 ContentNode/FolderNode/TrashNode
 	modifying order, title_color_* -> is dirty == True
 	saving order, title_color_*

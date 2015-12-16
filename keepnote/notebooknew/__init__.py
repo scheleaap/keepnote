@@ -109,7 +109,8 @@ class Notebook(object):
 		self.close_listeners = Listeners()
 		self._client_event_listeners = {}
 		
-		self._init_from_storage()
+		if notebook_storage is not None:
+			self._init_from_storage()
 	
 	def close(self):
 		self.closing_listeners.notify()
