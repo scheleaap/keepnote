@@ -40,6 +40,7 @@ DEFAULT_ICON_NORMAL = 'node_red_closed.png'
 DEFAULT_ICON_OPEN = 'node_red_open.png'
 DEFAULT_TITLE_COLOR_FOREGROUND = '#ffffff'
 DEFAULT_TITLE_COLOR_BACKGROUND = '#ff0000'
+DEFAULT_CLIENT_PREFERENCES = { 'test': { 'key': 'value' }}
 DEFAULT_PAYLOAD_NAMES = ['my_payload1', 'my_payload2']
 DEFAULT_HTML_PAYLOAD_NAME = os.path.basename('index.html')
 DEFAULT_HTML_PAYLOAD = base64.b64decode('PCFET0NUWVBFIGh0bWw+DQoNCjxoMT5UZXN0IE5vZGU8L2gxPg0KPHA+VGhpcyBpcyBhIG5vZGUgdXNlZCBmb3IgdGVzdGluZy48L3A+DQo=')
@@ -432,8 +433,14 @@ class ContentFolderTrashNodeTest():
 			self,
 			parent=None,
 			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 			created_timestamp=DEFAULT_CREATED_TIMESTAMP,
 			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
+			client_preferences=DEFAULT_CLIENT_PREFERENCES,
 			):
 		"""Creates a StorageNode of the class under test."""
 		raise NotImplementedError()
@@ -445,7 +452,7 @@ class ContentFolderTrashNodeTest():
 			parent=None,
 			loaded_from_storage=False,
 			title=DEFAULT_TITLE,
-			order=DEFAULT_ORDER,
+# 			order=DEFAULT_ORDER,
 			icon_normal=DEFAULT_ICON_NORMAL,
 			icon_open=DEFAULT_ICON_OPEN,
 			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
@@ -574,6 +581,221 @@ class ContentFolderTrashNodeTest():
 	def test_modified_time_changed_in_remote(self):
 		self.fail()
 	
+	def test_icon_normal_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(icon_normal=DEFAULT_ICON_NORMAL, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.icon_normal, notebook_storage.get_node(node.node_id).attributes[ICON_NORMAL_ATTRIBUTE])
+	
+	def test_icon_normal_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(icon_normal=DEFAULT_ICON_NORMAL, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.icon_normal = 'icon_new.png'
+		dao.sync()
+		
+		self.assertEqual(node.icon_normal, notebook_storage.get_node(node.node_id).attributes[ICON_NORMAL_ATTRIBUTE])
+	
+	def test_icon_normal_new_in_remote(self):
+		sn = self._create_storage_node(icon_normal=DEFAULT_ICON_NORMAL, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[ICON_NORMAL_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).icon_normal)
+	
+	@unittest.skip('TODO')
+	def test_icon_normal_changed_in_remote(self):
+		self.fail()
+	
+	def test_icon_open_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(icon_open=DEFAULT_ICON_OPEN, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.icon_open, notebook_storage.get_node(node.node_id).attributes[ICON_OPEN_ATTRIBUTE])
+	
+	def test_icon_open_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(icon_open=DEFAULT_ICON_OPEN, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.icon_open = 'icon_new.png'
+		dao.sync()
+		
+		self.assertEqual(node.icon_open, notebook_storage.get_node(node.node_id).attributes[ICON_OPEN_ATTRIBUTE])
+	
+	def test_icon_open_new_in_remote(self):
+		sn = self._create_storage_node(icon_open=DEFAULT_ICON_OPEN, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[ICON_OPEN_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).icon_open)
+	
+	@unittest.skip('TODO')
+	def test_icon_open_changed_in_remote(self):
+		self.fail()
+	
+	def test_title_color_foreground_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.title_color_foreground, notebook_storage.get_node(node.node_id).attributes[TITLE_COLOR_FOREGROUND_ATTRIBUTE])
+	
+	def test_title_color_foreground_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.title_color_foreground = '#c0c0c0'
+		dao.sync()
+		
+		self.assertEqual(node.title_color_foreground, notebook_storage.get_node(node.node_id).attributes[TITLE_COLOR_FOREGROUND_ATTRIBUTE])
+	
+	def test_title_color_foreground_new_in_remote(self):
+		sn = self._create_storage_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[TITLE_COLOR_FOREGROUND_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).title_color_foreground)
+	
+	@unittest.skip('TODO')
+	def test_title_color_foreground_changed_in_remote(self):
+		self.fail()
+	
+	def test_title_color_background_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.title_color_background, notebook_storage.get_node(node.node_id).attributes[TITLE_COLOR_BACKGROUND_ATTRIBUTE])
+	
+	def test_title_color_background_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.title_color_background = '#c0c0c0'
+		dao.sync()
+		
+		self.assertEqual(node.title_color_background, notebook_storage.get_node(node.node_id).attributes[TITLE_COLOR_BACKGROUND_ATTRIBUTE])
+	
+	def test_title_color_background_new_in_remote(self):
+		sn = self._create_storage_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[TITLE_COLOR_BACKGROUND_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).title_color_background)
+	
+	@unittest.skip('TODO')
+	def test_title_color_background_changed_in_remote(self):
+		self.fail()
+	
+	def test_client_preferences_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		node.client_preferences.get('test', 'key', define=True)
+		node.client_preferences.set('test', 'key', 'value')
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.client_preferences._data, notebook_storage.get_node(node.node_id).attributes[CLIENT_PREFERENCES_ATTRIBUTE])
+	
+	def test_client_preferences_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		node.client_preferences.get('test', 'key', define=True)
+		node.client_preferences.set('test', 'key', 'value')
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.client_preferences.get('test', 'key', define=True)
+		node.client_preferences.set('test', 'key', 'new value')
+		dao.sync()
+		
+		self.assertEqual(node.client_preferences._data, notebook_storage.get_node(node.node_id).attributes[CLIENT_PREFERENCES_ATTRIBUTE])
+	
+	def test_client_preferences_new_in_remote(self):
+		sn = self._create_storage_node(client_preferences=DEFAULT_CLIENT_PREFERENCES, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[CLIENT_PREFERENCES_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).client_preferences._data)
+	
+	@unittest.skip('TODO')
+	def test_client_preferences_changed_in_remote(self):
+		self.fail()
+	
 
 
 class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
@@ -581,15 +803,27 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			self,
 			parent=None,
 			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 			created_timestamp=DEFAULT_CREATED_TIMESTAMP,
 			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
+			client_preferences=DEFAULT_CLIENT_PREFERENCES,
 			):
 		
 		attributes = {
 			MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
 			TITLE_ATTRIBUTE: title,
+# 			ORDER_ATTRIBUTE: order,
+			ICON_NORMAL_ATTRIBUTE: icon_normal,
+			ICON_OPEN_ATTRIBUTE: icon_open,
+			TITLE_COLOR_FOREGROUND_ATTRIBUTE: title_color_foreground,
+			TITLE_COLOR_BACKGROUND_ATTRIBUTE: title_color_background,
 			CREATED_TIME_ATTRIBUTE: created_timestamp,
 			MODIFIED_TIME_ATTRIBUTE: modified_timestamp,
+			CLIENT_PREFERENCES_ATTRIBUTE: client_preferences,
 		}
 		if parent is not None:
 			attributes[PARENT_ID_ATTRIBUTE] = parent.node_id
@@ -613,10 +847,10 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			loaded_from_storage=False,
 			title=DEFAULT_TITLE,
 # 			order=DEFAULT_ORDER,
-# 			icon_normal=DEFAULT_ICON_NORMAL,
-# 			icon_open=DEFAULT_ICON_OPEN,
-# 			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
-# 			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
 			node_id=DEFAULT,
 			created_time=DEFAULT,
 			modified_time=DEFAULT,
@@ -666,10 +900,10 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 # 				order=order,
-# 				icon_normal=icon_normal,
-# 				icon_open=icon_open,
-# 				title_color_foreground=title_color_foreground,
-# 				title_color_background=title_color_background,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
 				main_payload=main_payload,
 				additional_payloads=additional_payloads,
 				node_id=node_id,

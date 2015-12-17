@@ -7,7 +7,13 @@ Implement new in local, new in remote, changed in local sync
 x	title
 x	created_time
 x	modified_time
-	...
+	order
+x	icon_normal
+x	icon_open
+x	title_fgcolor
+x	title_bgcolor
+x	client_preferences
+	parent_id
 	payload
 Implement changed in remote sync
 	all attributes

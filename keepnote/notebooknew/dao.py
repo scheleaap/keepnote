@@ -45,14 +45,16 @@ def get_attribute_value(attribute_definition, attributes):
 	@return: attributes[attribute_definition.key] converted to the proper type if it exists in attributes, else attribute_definition.default
 	"""
 	if attribute_definition.key in attributes:
-		string_value = attributes[attribute_definition.key]
+		value = attributes[attribute_definition.key]
 		if attribute_definition.type == 'string':
-			return string_value
+			return value
 		elif attribute_definition.type == 'int':
-			return int(string_value)
+			return int(value)
 		elif attribute_definition.type == 'timestamp':
-			dt = datetime.fromtimestamp(int(string_value), tz=utc)
+			dt = datetime.fromtimestamp(int(value), tz=utc)
 			return dt
+		else:
+			return value
 	else:
 		return attribute_definition.default
 
@@ -277,12 +279,18 @@ class ContentNodeDao(NotebookNodeDao):
 		attributes = {
 # 				MAIN_PAYLOAD_NAME_ATTRIBUTE.key: nn.main_payload_name,
 				TITLE_ATTRIBUTE.key: nn.title,
-# 				ICON_NORMAL_ATTRIBUTE.key: nn.icon_normal,
-# 				ICON_OPEN_ATTRIBUTE.key: nn.icon_open,
-# 				CLIENT_PREFERENCES_ATTRIBUTE.key: nn.client_preferences._data,
+				CLIENT_PREFERENCES_ATTRIBUTE.key: nn.client_preferences._data,
 				}
 # 		if nn.parent is not None:
 # 			attributes[PARENT_ID_ATTRIBUTE.key] = nn.parent.node_id
+		if nn.icon_normal is not None:
+			attributes[ICON_NORMAL_ATTRIBUTE.key] = nn.icon_normal
+		if nn.icon_open is not None:
+			attributes[ICON_OPEN_ATTRIBUTE.key] = nn.icon_open
+		if nn.title_color_foreground is not None:
+			attributes[TITLE_COLOR_FOREGROUND_ATTRIBUTE.key] = nn.title_color_foreground
+		if nn.title_color_background is not None:
+			attributes[TITLE_COLOR_BACKGROUND_ATTRIBUTE.key] = nn.title_color_background
 		if nn.created_time is not None:
 			attributes[CREATED_TIME_ATTRIBUTE.key] = datetime_to_timestamp(nn.created_time)
 		if nn.modified_time is not None:
@@ -295,10 +303,11 @@ class ContentNodeDao(NotebookNodeDao):
 		created_time = get_attribute_value(CREATED_TIME_ATTRIBUTE, sn.attributes)
 		modified_time = get_attribute_value(MODIFIED_TIME_ATTRIBUTE, sn.attributes)
 # 		order = get_attribute_value(ORDER_ATTRIBUTE, sn.attributes)
-# 		icon_normal = get_attribute_value(ICON_NORMAL_ATTRIBUTE, sn.attributes)
-# 		icon_open = get_attribute_value(ICON_OPEN_ATTRIBUTE, sn.attributes)
-# 		title_color_foreground = get_attribute_value(TITLE_COLOR_FOREGROUND_ATTRIBUTE, sn.attributes)
-# 		title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, sn.attributes)
+		icon_normal = get_attribute_value(ICON_NORMAL_ATTRIBUTE, sn.attributes)
+		icon_open = get_attribute_value(ICON_OPEN_ATTRIBUTE, sn.attributes)
+		title_color_foreground = get_attribute_value(TITLE_COLOR_FOREGROUND_ATTRIBUTE, sn.attributes)
+		title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, sn.attributes)
+		client_preferences = get_attribute_value(CLIENT_PREFERENCES_ATTRIBUTE, sn.attributes)
 		
 		if not sn.payload_names:
 			raise InvalidStructureError('Content node {node_id} has no payload'.format(
@@ -325,10 +334,11 @@ class ContentNodeDao(NotebookNodeDao):
 				loaded_from_storage=True,
 				title=title,
 # 				order=order,
-# 				icon_normal=icon_normal,
-# 				icon_open=icon_open,
-# 				title_color_foreground=title_color_foreground,
-# 				title_color_background=title_color_background,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=sn.node_id,
 				created_time=created_time,
 				modified_time=modified_time,

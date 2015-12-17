@@ -384,6 +384,7 @@ class NotebookNode(object):
 			icon_open=None,
 			title_color_foreground=None,
 			title_color_background=None,
+			client_preferences=None,
 			node_id=None,
 			created_time=None,
 			modified_time=None
@@ -401,6 +402,7 @@ class NotebookNode(object):
 		@param icon_open: TODO
 		@param title_color_foreground: TODO
 		@param title_color_background: TODO
+		@param client_preferences: TODO
 		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
@@ -415,8 +417,8 @@ class NotebookNode(object):
 		self.order = order
 		self._icon_normal = icon_normal
 		self._icon_open = icon_open
-		self.title_color_foreground = title_color_foreground
-		self.title_color_background = title_color_background
+		self._title_color_foreground = title_color_foreground
+		self._title_color_background = title_color_background
 		self._unsaved_changes = set()
 		if loaded_from_storage:
 			if node_id is None:
@@ -436,7 +438,7 @@ class NotebookNode(object):
 			self._modified_time = self._created_time
 			self._unsaved_changes.add(NotebookNode.NEW)
 		
-		self.client_preferences = Pref()
+		self.client_preferences = Pref(client_preferences)
 		self.client_preferences.change_listeners.add(self._on_client_preferences_change)
 	
 	def _add_child_node(self, child_node):
@@ -617,6 +619,36 @@ class NotebookNode(object):
 			self._unsaved_changes.add(NotebookNode.CHANGED_TITLE)
 		
 		self.modified_time = datetime.now(tz=utc)
+	
+	@property
+	def title_color_background(self):
+		return self._title_color_background
+	
+	@title_color_background.setter
+	def title_color_background(self, title_color_background):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot set the title background color of a deleted node')
+		
+		self._title_color_background = title_color_background
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(NotebookNode.DUMMY_CHANGE)
+		
+		self.modified_time = datetime.now(tz=utc)
+	
+	@property
+	def title_color_foreground(self):
+		return self._title_color_foreground
+	
+	@title_color_foreground.setter
+	def title_color_foreground(self, title_color_foreground):
+		if self.is_deleted:
+			raise IllegalOperationError('Cannot set the title foreground color of a deleted node')
+		
+		self._title_color_foreground = title_color_foreground
+		if NotebookNode.NEW not in self._unsaved_changes:
+			self._unsaved_changes.add(NotebookNode.DUMMY_CHANGE)
+		
+		self.modified_time = datetime.now(tz=utc)
 
 
 class AbstractContentFolderNode(NotebookNode):
@@ -793,6 +825,7 @@ class ContentNode(AbstractContentFolderNode):
 			icon_open=None,
 			title_color_foreground=None,
 			title_color_background=None,
+			client_preferences=None,
 			main_payload=None,
 			additional_payloads=None,
 			node_id=None,
@@ -836,6 +869,7 @@ class ContentNode(AbstractContentFolderNode):
 				icon_open=icon_open,
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=node_id,
 				created_time=created_time,
 				modified_time=modified_time,
@@ -1011,6 +1045,7 @@ class FolderNode(AbstractContentFolderNode):
 			icon_open=None,
 			title_color_foreground=None,
 			title_color_background=None,
+			client_preferences=None,
 			node_id=None,
 			created_time=None,
 			modified_time=None,
@@ -1043,6 +1078,7 @@ class FolderNode(AbstractContentFolderNode):
 				icon_open=icon_open,
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=node_id,
 				created_time=created_time,
 				modified_time=modified_time,
@@ -1147,6 +1183,7 @@ class TrashNode(NotebookNode):
 			icon_open=None,
 			title_color_foreground=None,
 			title_color_background=None,
+			client_preferences=None,
 			node_id=None,
 			created_time=None,
 			modified_time=None,
@@ -1179,6 +1216,7 @@ class TrashNode(NotebookNode):
 				icon_open=icon_open,
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=node_id,
 				created_time=created_time,
 				modified_time=modified_time,
