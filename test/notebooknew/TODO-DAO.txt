@@ -4,6 +4,8 @@ Create trash on first delete
 Implement payload hash in NotebookStorage
 Implement node timestamp in NotebookStorage
 Implement new in local, new in remote, changed in local sync
+x	content_type
+x	parent_id
 x	title
 x	created_time
 x	modified_time
@@ -13,7 +15,6 @@ x	icon_open
 x	title_fgcolor
 x	title_bgcolor
 x	client_preferences
-	parent_id
 	payload
 Implement changed in remote sync
 	all attributes

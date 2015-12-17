@@ -281,8 +281,8 @@ class ContentNodeDao(NotebookNodeDao):
 				TITLE_ATTRIBUTE.key: nn.title,
 				CLIENT_PREFERENCES_ATTRIBUTE.key: nn.client_preferences._data,
 				}
-# 		if nn.parent is not None:
-# 			attributes[PARENT_ID_ATTRIBUTE.key] = nn.parent.node_id
+		if nn.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE.key] = nn.parent.node_id
 		if nn.icon_normal is not None:
 			attributes[ICON_NORMAL_ATTRIBUTE.key] = nn.icon_normal
 		if nn.icon_open is not None:
@@ -329,7 +329,7 @@ class ContentNodeDao(NotebookNodeDao):
 		nn = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				content_type='bla',#sn.content_type,
+				content_type=sn.content_type,
 				parent=None,
 				loaded_from_storage=True,
 				title=title,

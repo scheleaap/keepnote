@@ -431,6 +431,7 @@ class StructureTest:#(unittest.TestCase):
 class ContentFolderTrashNodeTest():
 	def _create_storage_node(
 			self,
+			content_type=DEFAULT_CONTENT_TYPE,
 			parent=None,
 			title=DEFAULT_TITLE,
 # 			order=DEFAULT_ORDER,
@@ -449,6 +450,7 @@ class ContentFolderTrashNodeTest():
 			self,
 			notebook_storage=None,
 			notebook=None,
+			content_type=DEFAULT_CONTENT_TYPE,
 			parent=None,
 			loaded_from_storage=False,
 			title=DEFAULT_TITLE,
@@ -468,6 +470,73 @@ class ContentFolderTrashNodeTest():
 	def _get_class_dao(self):
 		"""Returns the NotebookNodeDao class for the class under test."""
 		raise NotImplementedError()
+	
+	def test_content_type_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(content_type=DEFAULT_CONTENT_TYPE, parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.content_type, notebook_storage.get_node(node.node_id).content_type)
+	
+	def test_content_type_new_in_remote(self):
+		sn = self._create_storage_node(content_type=DEFAULT_CONTENT_TYPE, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.content_type, notebook.get_node_by_id(sn.node_id).content_type)
+	
+	def test_parent_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.parent.node_id, notebook_storage.get_node(node.node_id).attributes[PARENT_ID_ATTRIBUTE])
+	
+	def test_parent_changed_in_local(self):
+		root = TestNotebookNode()
+		other_node = TestNotebookNode(parent=root, add_to_parent=True)
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		node.move(other_node)
+		dao.sync()
+		
+		self.assertEqual(node.parent.node_id, notebook_storage.get_node(node.node_id).attributes[PARENT_ID_ATTRIBUTE])
+	
+	def test_parent_new_in_remote(self):
+		sn = self._create_storage_node(parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[PARENT_ID_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).parent.node_id)
+	
+	@unittest.skip('TODO')
+	def test_parent_changed_in_remote(self):
+		self.fail()
 	
 	def test_title_new_in_local(self):
 		root = TestNotebookNode()
@@ -801,6 +870,7 @@ class ContentFolderTrashNodeTest():
 class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 	def _create_storage_node(
 			self,
+			content_type=DEFAULT_CONTENT_TYPE,
 			parent=None,
 			title=DEFAULT_TITLE,
 # 			order=DEFAULT_ORDER,
@@ -830,7 +900,7 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		
 		node = StorageNode(
 			node_id=new_node_id(),
-			content_type=DEFAULT_CONTENT_TYPE,
+			content_type=content_type,
 			attributes=attributes,
 			payloads=[
 					StorageNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
@@ -843,6 +913,7 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 	def _create_notebook_node(
 			self,
 			notebook=None,
+			content_type=DEFAULT_CONTENT_TYPE,
 			parent=None,
 			loaded_from_storage=False,
 			title=DEFAULT_TITLE,
@@ -895,7 +966,7 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		node = ContentNode(
 				notebook_storage=None,
 				notebook=notebook,
-				content_type=DEFAULT_CONTENT_TYPE,
+				content_type=content_type,
 				parent=parent,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
