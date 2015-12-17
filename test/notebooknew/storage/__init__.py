@@ -14,7 +14,7 @@ DEFAULT_ATTRIBUTES = { 'title': DEFAULT_TITLE, 'key2': 'value2' }
 CONTENT_TYPE_HTML = 'text/html'
 DEFAULT_HTML_PAYLOAD_PATH = '../../../tests/data/content/index.html'
 DEFAULT_HTML_PAYLOAD_NAME = os.path.basename(DEFAULT_HTML_PAYLOAD_PATH)
-DEFAULT_PNG_PAYLOAD_PATH = '../../../tests/data/content/image.png'
+DEFAULT_PNG_PAYLOAD_PATH = '../../../tests/data/content/image1.png'
 DEFAULT_PNG_PAYLOAD_NAME = os.path.basename(DEFAULT_PNG_PAYLOAD_PATH)
 
 class StoredNotebookTest(unittest.TestCase):
@@ -96,6 +96,19 @@ class NotebookStorageTestBase(object):
         s = self.create_notebook_storage()
         self.assertEquals(create_stored_node(content_type=u'<äëïöüß€&ש>', attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' }, payload_names=[u'äëïöüß€ש']), s.get_node(id_))
     
+    def test_add_node_attributes_copied(self):
+        attributes = { 'key': 'value' }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes=attributes, payloads=[], payload_paths=[])
+        
+        # Change the local attributes object.
+        attributes['key'] = 'new value'
+
+        # Then read the attributes.
+        self.assertEqual('value', s.get_node(id_).attributes['key'])
+ 
     def test_get_node_nonexistent(self):
         s = self.create_notebook_storage()
         with self.assertRaises(NodeDoesNotExistError):
@@ -252,8 +265,8 @@ class NotebookStorageTestBase(object):
             s.remove_node_payload('node_id', 'payload_name')
     
     def test_set_node_attributes(self):
-        attributes1={ 'title': 'title 1', 'version_1': 'This is only there in the first version.'}
-        attributes2={ 'title': 'title 2', 'version_2': 'This is only there in the second version.'}
+        attributes1 = { 'title': 'title 1', 'version_1': 'This is only there in the first version.' }
+        attributes2 = { 'title': 'title 2', 'version_2': 'This is only there in the second version.' }
         
         # Add node first.
         s = self.create_notebook_storage()
@@ -273,6 +286,20 @@ class NotebookStorageTestBase(object):
         stored_node2=s.get_node(id_)
         self.assertEquals(attributes2, stored_node2.attributes)
     
+    def test_set_node_attributes_copied(self):
+        attributes = { 'key': 'value' }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        s.set_node_attributes(id_, attributes)
+
+        # Change the local attributes object.
+        attributes['key'] = 'new value'
+        
+        # Then read the attributes.
+        self.assertEqual('value', s.get_node(id_).attributes['key'])
+    
     def test_set_node_attributes_nonexistent_node(self):
         s = self.create_notebook_storage()
         with self.assertRaises(NodeDoesNotExistError):
@@ -289,7 +316,20 @@ class NotebookStorageTestBase(object):
 
         # Then read them.
         s = self.create_notebook_storage()
-        self.assertEqual(create_stored_notebook(), s.get_notebook())
+        self.assertEqual(DEFAULT_ATTRIBUTES, s.get_notebook().attributes)
+    
+    def test_set_notebook_attributes_copied(self):
+        attributes = { 'key': 'value' }
+        
+        # Set the attributes first.
+        s = self.create_notebook_storage()
+        s.set_notebook_attributes(attributes=attributes)
+        
+        # Change the local attributes object.
+        attributes['key'] = 'new value'
+
+        # Then read them.
+        self.assertEqual('value', s.get_notebook().attributes['key'])
 
 
 # Utility functions

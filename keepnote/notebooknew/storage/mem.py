@@ -1,5 +1,6 @@
 """Memory based storage."""
 
+import copy
 import io
 import logging
 
@@ -20,6 +21,7 @@ class InMemoryStorage(NotebookStorage):
 		if self.has_node(node_id):
 			raise NodeAlreadyExistsError()
 		
+		attributes = copy.deepcopy(attributes)
 		stored_node = StoredNode(node_id, content_type, attributes, payload_names=[])
 		stored_node.payload_files = {}
 		self.stored_nodes[node_id] = stored_node
@@ -85,9 +87,11 @@ class InMemoryStorage(NotebookStorage):
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError()
 		
+		attributes = copy.deepcopy(attributes)
 		self.stored_nodes[node_id].attributes = attributes
 		
 	def set_notebook_attributes(self, attributes):
+		attributes = copy.deepcopy(attributes)
 		self.stored_notebook.attributes = attributes
 
 	def __repr__(self):
