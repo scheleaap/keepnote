@@ -51,7 +51,7 @@ def add_storage_node(notebook_storage, sn):
 			node_id=sn.node_id,
 			content_type=sn.content_type,
 			attributes=sn.attributes,
-			payloads=[ (p.name, io.BytesIO(p.data)) for p in sn.payloads ]
+			payloads=[ (p.name, p.get_data()) for p in sn.payloads ]
 			)
 	
 def datetime_to_timestamp(dt):
@@ -874,6 +874,7 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			created_timestamp=DEFAULT_CREATED_TIMESTAMP,
 			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
 			client_preferences=DEFAULT_CLIENT_PREFERENCES,
+			main_payload=DEFAULT,
 			):
 		
 		attributes = {
@@ -891,13 +892,16 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		if parent is not None:
 			attributes[PARENT_ID_ATTRIBUTE] = parent.node_id
 		
+		if main_payload is DEFAULT:
+			main_payload = StoredNodePayloadWithData(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH, lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA))
+		
 		node = StoredNode(
 			node_id=new_node_id(),
 			content_type=content_type,
 			attributes=attributes,
 			payloads=[
-					StoredNodePayloadWithData(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH, DEFAULT_HTML_PAYLOAD_DATA),
-					StoredNodePayloadWithData(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH, DEFAULT_PNG_PAYLOAD_DATA),
+					main_payload,
+					StoredNodePayloadWithData(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH, lambda: io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA)),
 					]
 			)
 		
@@ -1078,7 +1082,10 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 	
 	def test_main_payload_new_in_local(self):
 		root = TestNotebookNode()
-		node = self._create_notebook_node(main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA), additional_payloads=[], parent=root, add_to_parent=True)
+		node = self._create_notebook_node(
+				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
+				additional_payloads=[],
+				parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
@@ -1087,12 +1094,15 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		dao.sync()
 		
 		self.assertEqual(node.main_payload_name, notebook_storage.get_node(node.node_id).attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE])
-		self.assertEqual([StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH)], notebook_storage.get_node(node.node_id).payloads)
+		self.assertEqual(True, StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
 	
 	def test_main_payload_changed_in_local(self):
 		root = TestNotebookNode()
-		node = self._create_notebook_node(main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA), additional_payloads=[], parent=root, add_to_parent=True)
+		node = self._create_notebook_node(
+				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
+				additional_payloads=[],
+				parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
@@ -1103,8 +1113,27 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			f.write(DEFAULT_PNG_PAYLOAD_DATA)
 		dao.sync()
 		
-		self.assertEqual([StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH)], notebook_storage.get_node(node.node_id).payloads)
+		self.assertEqual(True, StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
+	
+	def test_main_payload_new_in_remote(self):
+		sn = self._create_storage_node(
+				main_payload=StoredNodePayloadWithData(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH, lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)),
+				parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(sn.attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE], notebook.get_node_by_id(sn.node_id).main_payload_name)
+		self.assertEqual(sn.get_payload(DEFAULT_HTML_PAYLOAD_NAME).get_data().read(), notebook.get_node_by_id(sn.node_id).payloads[DEFAULT_HTML_PAYLOAD_NAME].open(mode='r').read())
+	
+	@unittest.skip('TODO')
+	def test_main_payload_changed_in_remote(self):
+		self.fail()
 	
 
 

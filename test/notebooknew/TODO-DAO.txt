@@ -18,8 +18,8 @@ x	client_preferences
 	payload
 x		test_main_payload_new_in_local
 x		test_main_payload_changed_in_local
-		test_main_payload_new_in_remote
-		test_main_payload_changed_in_remote
+x		test_main_payload_new_in_remote
+/		test_main_payload_changed_in_remote
 		test_additional_payloads_new_in_local
 		test_additional_payloads_added_in_local
 		test_additional_payloads_changed_in_local

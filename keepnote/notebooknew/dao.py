@@ -67,19 +67,25 @@ def get_attribute_value(attribute_definition, attributes):
 class StoredNodePayloadWithData(StoredNodePayload):
 	"""Contains payload metadata and optionally the payload data of a StoredNode."""
 	
-	def __init__(self, name, md5hash, data):
+	def __init__(self, name, md5hash, data_reader):
+		"""Constructor.
+		
+		@param name: The name of the payload.
+		@param md5hash: The MD5 hash of the payload data.
+		@param data_reader: A function that returns the a file-like object containing the payload data.
+		"""
 		super(StoredNodePayloadWithData, self).__init__(name, md5hash)
-		self.data = data
+		self.get_data = data_reader
 	
 	def has_data(self):
-		return self.data is not None
+		return self.get_data is not None
 	
 	def __eq__(self, other):
 		return \
 			isinstance(other, StoredNodePayloadWithData) and \
 			self.name == other.name and \
 			self.md5hash == other.md5hash and \
-			self.data == other.data
+			self.get_data == other.get_data
 	
 	def __ne__(self, other):
 		return not self.__eq__(other);
@@ -130,7 +136,8 @@ class Dao(object):
 					if remote_sn.has_payload(local_payload.name) and remote_sn.get_payload(local_payload.name).md5hash != local_payload.md5hash:
 						# TODO: Replace with set_payload() or update_node()
 						self._notebook_storage.remove_node_payload(node_id, local_payload.name)
-						self._notebook_storage.add_node_payload(node_id, local_payload.name, local_payload.data())
+						with local_payload.get_data() as f:
+							self._notebook_storage.add_node_payload(node_id, local_payload.name, f)
 		
 		self._last_local_node_versions = local_sns_by_id.keys()
 		
@@ -138,12 +145,17 @@ class Dao(object):
 	def _add_new_in_local_to_remote(self, sns_by_id, node_ids):
 		for node_id in node_ids:
 			sn = sns_by_id[node_id]
-			self._notebook_storage.add_node(
-					node_id=sn.node_id,
-					content_type=sn.content_type,
-					attributes=sn.attributes,
-					payloads=[ (payload.name, payload.data()) for payload in sn.payloads]
-					)
+			payloads = [ (payload.name, payload.get_data()) for payload in sn.payloads]
+			try:
+				self._notebook_storage.add_node(
+						node_id=sn.node_id,
+						content_type=sn.content_type,
+						attributes=sn.attributes,
+						payloads=payloads,
+						)
+			finally:
+				for payload in payloads:
+					payload[1].close()
 	
 	def _add_new_in_remote_to_local(self, sns_by_id, node_ids):
 		# Create NotebookNodes for all StoredNotes and index all StoredNotes and NotebookNodes by id.
@@ -282,7 +294,7 @@ class ContentNodeDao(NotebookNodeDao):
 			payloads.append(StoredNodePayloadWithData(
 					name=payload.name,
 					md5hash=payload.get_md5hash(),
-					data=partial(payload.open, mode='r'),
+					data_reader=partial(payload.open, mode='r'),
 					))
 		
 		return StoredNode(nn.node_id, nn.content_type, attributes, payloads=payloads)
@@ -316,7 +328,7 @@ class ContentNodeDao(NotebookNodeDao):
 		
 		main_payload = ReadFromStorageWriteToMemoryPayload(
 				name=main_payload_name,
-				original_reader=lambda: notebook_storage.get_node_payload('whatev', 'dog'),#sn.node_id, main_payload_name),
+				original_reader=lambda: notebook_storage.get_node_payload(sn.node_id, main_payload_name),
 				original_md5hash='whazzup',
 				)
 		additional_payloads = [
