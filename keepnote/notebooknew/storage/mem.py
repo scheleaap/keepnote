@@ -1,6 +1,7 @@
 """Memory based storage."""
 
 import copy
+import hashlib
 import io
 import logging
 
@@ -22,7 +23,7 @@ class InMemoryStorage(NotebookStorage):
 			raise NodeAlreadyExistsError()
 		
 		attributes = copy.deepcopy(attributes)
-		stored_node = StoredNode(node_id, content_type, attributes, payload_names=[])
+		stored_node = StoredNode(node_id, content_type, attributes, payloads=[])
 		stored_node.payload_files = {}
 		self.stored_nodes[node_id] = stored_node
 		for payload in payloads:
@@ -34,11 +35,14 @@ class InMemoryStorage(NotebookStorage):
 		if self.has_node_payload(node_id, payload_name):
 			raise PayloadAlreadyExistsError(node_id, payload_name)
 		
+		data = payload_file.read()
+		
 		stored_node = self.stored_nodes[node_id]
 		payload = io.BytesIO()
-		payload.write(payload_file.read())
+		payload.write(data)
+		payload_hash = hashlib.md5(data).hexdigest()
 		stored_node.payload_files[payload_name] = payload
-		stored_node.payload_names.append(payload_name)
+		stored_node.payloads.append(StoredNodePayload(payload_name, payload_hash))
 	
 	def get_all_nodes(self):
 		for id in self.stored_nodes.keys():
@@ -81,6 +85,8 @@ class InMemoryStorage(NotebookStorage):
 		if not self.has_node_payload(node_id, payload_name):
 			raise PayloadDoesNotExistError(node_id, payload_name)
 		
+		payload = [payload for payload in self.stored_nodes[node_id].payloads if payload.name == payload_name][0]
+		self.stored_nodes[node_id].payloads.remove(payload)
 		del self.stored_nodes[node_id].payload_files[payload_name]
 	
 	def set_node_attributes(self, node_id, attributes):

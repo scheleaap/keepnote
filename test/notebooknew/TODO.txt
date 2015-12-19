@@ -12,6 +12,8 @@
 - NotebookError
 - NotebookVersionError
 - basetreeview._add_model_column(): get = lambda ...
+- integration test: opening a notebook with 1000 assets takes <= 0.5 seconds
+- integration test: saving a notebook with 1000 assets takes <= 0.5 seconds
 
 Notebook
 ?	title

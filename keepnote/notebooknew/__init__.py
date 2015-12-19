@@ -15,6 +15,7 @@ from keepnote.notebooknew.storage import StoredNode
 __all__ = [
 		'Notebook',
 		'NotebookNode',
+		'NotebookNodePayload',
 		'ContentNode',
 		'FolderNode',
 		'TrashNode',
@@ -651,6 +652,43 @@ class NotebookNode(object):
 		self.modified_time = datetime.now(tz=utc)
 
 
+class NotebookNodePayload(object):
+	"""A payload of a node.
+	
+	@ivar name: The name of the payload.
+	"""
+	
+	def __init__(self, name):
+		"""Constructor.
+		
+		@param name: The name of the payload.
+		"""
+		self.name = name
+	
+	def copy(self):
+		"""Copies the NotebookNodePayload.
+		
+		@return: A new, equivalent NotebookNodePayload object.
+		"""
+		raise NotImplementedError(self.copy.__name__)
+	
+	def get_md5hash(self):
+		"""Returns the current hash of the payload data.
+		
+		This may provide an efficient way of comparing payload data, but it may also involve opening and reading the payload.
+		@return: The hash of the current payload data. 
+		"""
+		raise NotImplementedError(self.get_md5hash.__name__)
+		
+	def open(self, mode='r'):
+		"""Opens the payload data.
+		
+		@param mode: Specifies the mode in which the payload data must be opened. 'r' specifies (binary) reading, 'w' specifies (binary) writing.
+		@return: An object implementing IOBase.
+		"""
+		raise NotImplementedError(self.open.__name__)
+
+
 class AbstractContentFolderNode(NotebookNode):
 	"""A base class for content and folder nodes in a notebook.
 	"""
@@ -745,9 +783,6 @@ class AbstractContentFolderNode(NotebookNode):
 		self.modified_time = datetime.now(tz=utc)
 	
 	def new_content_child_node(self, content_type, title, main_payload, additional_payloads, behind=None):
-#		if additional_payloads is None:
-#			additional_payloads = []
-		
 		if self.is_in_trash:
 			raise IllegalOperationError('Cannot add a child to a node in trash')
 		elif self.is_deleted:
@@ -761,7 +796,7 @@ class AbstractContentFolderNode(NotebookNode):
 				title=title,
 				loaded_from_storage=False,
 				main_payload=main_payload,
-				additional_payloads=additional_payloads
+				additional_payloads=additional_payloads,
 				)
 		if behind is None:
 			self._add_child_node(child)
@@ -798,13 +833,14 @@ class AbstractContentFolderNode(NotebookNode):
 		
 		return child
 
-	
+
 class ContentNode(AbstractContentFolderNode):
 	"""A node with content in a notebook. Every content node has at least one payload and may have additional payloads.
 
 	TODO:
 	@ivar main_payload_name
 	@ivar additional_payload_names: The names of the payloads of the node.
+	@ivar payloads
 	"""
 	
 	# Change constants
@@ -831,8 +867,6 @@ class ContentNode(AbstractContentFolderNode):
 			node_id=None,
 			created_time=None,
 			modified_time=None,
-			main_payload_name=None,
-			additional_payload_names=None
 			):
 		"""Constructor.
 		
@@ -843,19 +877,17 @@ class ContentNode(AbstractContentFolderNode):
 		@param content_type: The content type of node.
 		@param parent: The parent of the node or None.
 		@param loaded_from_storage: TODO
+		@param main_payload: A ContentNodePayload object.
 		@param title: The title of the node.
 		@param order: TODO
 		@param icon_normal: TODO
 		@param icon_open: TODO
 		@param title_color_foreground: TODO
 		@param title_color_background: TODO
-		@param main_payload: A tuple consisting of the main paylad name and the main payload data. Only if loaded_from_storage == False.
-		@param additional_payloads: A list containing tuples consisting of paylad names and payload data. Only if loaded_from_storage == False.
+		@param additional_payloads: A list containing ContentNodePayload objects.
 		@param node_id: The id of the node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
-		@param main_payload_name: The name of the main payload. Only if loaded_from_storage == True.
-		@param additional_payload_names: The names of the additional payloads. Only if loaded_from_storage == True.
 		"""
 		super(ContentNode, self).__init__(
 				notebook_storage=notebook_storage,
@@ -875,33 +907,34 @@ class ContentNode(AbstractContentFolderNode):
 				modified_time=modified_time,
 				)
 		if loaded_from_storage:
-			if node_id is None or main_payload_name is None or additional_payload_names is None:
+			if node_id is None or main_payload is None or additional_payloads is None:
 				raise IllegalArgumentCombinationError()
-				
-			self.main_payload_name = main_payload_name
-			self.additional_payload_names = additional_payload_names
-			self._payloads_to_store = OrderedDict()
 		else:
 			if node_id is not None or main_payload is None or additional_payloads is None:
 				raise IllegalArgumentCombinationError()
-			
-			self.main_payload_name = main_payload[0]
-			self.additional_payload_names = [additional_payload[0] for additional_payload in additional_payloads]
-			self._payloads_to_store = OrderedDict([main_payload] + additional_payloads)
 		
-		self._payload_names_to_remove = []
+		if main_payload is not None: # TODO Remove
+			self.main_payload_name = main_payload.name
+			self.payloads = { main_payload.name: main_payload }
+		self.additional_payload_names = []
+		if additional_payloads is not None:
+			for additional_payload in additional_payloads:
+				self.additional_payload_names.append(additional_payload.name)
+				self.payloads[additional_payload.name] = additional_payload
 	
-	def add_additional_payload(self, payload_name, payload_data):
-		"""TODO"""
-		if payload_name == self.main_payload_name:
-			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload_name))
-		elif payload_name in self.additional_payload_names:
-			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload_name))
+	def add_additional_payload(self, payload):
+		"""Adds an additional payload.
 		
-		self.additional_payload_names.append(payload_name)
-		self._payloads_to_store[payload_name] = payload_data
-		if NotebookNode.NEW not in self._unsaved_changes:
-			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
+		@param payload: A ContentNodePayload object.
+		@raise PayloadAlreadyExistsError: If the node already has a payload with the same name.
+		"""
+		if payload.name == self.main_payload_name:
+			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload.name))
+		elif payload.name in self.additional_payload_names:
+			raise PayloadAlreadyExistsError('A payload with the name "{name}" already exists'.format(name=payload.name))
+		
+		self.additional_payload_names.append(payload.name)
+		self.payloads[payload.name] = payload
 		
 		self.modified_time = datetime.now(tz=utc)
 	
@@ -916,8 +949,8 @@ class ContentNode(AbstractContentFolderNode):
 		copy = target.new_content_child_node(
 				content_type=self.content_type,
 				title=self._title,
-				main_payload=(self.main_payload_name, self.get_payload(self.main_payload_name)),
-				additional_payloads=[(additional_payload_name, self.get_payload(additional_payload_name)) for additional_payload_name in self.additional_payload_names],
+				main_payload=self.payloads[self.main_payload_name].copy(),
+				additional_payloads=[self.payloads[additional_payload_name].copy() for additional_payload_name in self.additional_payload_names],
 				behind=behind
 				)
 		if with_subtree:
@@ -928,11 +961,14 @@ class ContentNode(AbstractContentFolderNode):
 		return copy
 	
 	def get_payload(self, payload_name):
-		"""TODO"""
-		if payload_name in self._payloads_to_store:
-			return self._payloads_to_store[payload_name]
-		elif payload_name == self.main_payload_name or payload_name in self.additional_payload_names:
-			return self._notebook_storage.get_node_payload(self.node_id, payload_name).read()
+		"""Returns a payload.
+		
+		@param payload_name: The name of the payload to add.
+		@return: A ContentNodePayload object.
+		@raise PayloadDoesNotExistError: If the node does not have a payload with the given name.
+		"""
+		if payload_name in self.payloads:
+			return self.payloads[payload_name]
 		else:
 			raise PayloadDoesNotExistError(payload_name)
 	
@@ -955,14 +991,14 @@ class ContentNode(AbstractContentFolderNode):
 		return attributes
 	
 	def remove_additional_payload(self, payload_name):
-		"""TODO"""
-		if payload_name in self._payloads_to_store:
+		"""Removes a payload.
+		
+		@param payload_name: The name of the payload to remove.
+		@raise PayloadDoesNotExistError: If the node does not have a payload with the given name.
+		"""
+		if payload_name in self.payloads:
 			self.additional_payload_names.remove(payload_name)
-			del self._payloads_to_store[payload_name]
-		elif payload_name == self.main_payload_name or payload_name in self.additional_payload_names:
-			self.additional_payload_names.remove(payload_name)
-			self._payload_names_to_remove.append(payload_name)
-			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
+			del self.payloads[payload_name]
 		else:
 			raise PayloadDoesNotExistError(payload_name)
 		
@@ -981,8 +1017,7 @@ class ContentNode(AbstractContentFolderNode):
 					node_id=self.node_id,
 					content_type=self.content_type,
 					attributes=self._notebook_storage_attributes,
-					payloads=[(payload_name, io.BytesIO(payload_data)) for (payload_name, payload_data) in self._payloads_to_store.iteritems()])
-			self._payloads_to_store.clear()
+					payloads=[])
 			self._unsaved_changes.remove(NotebookNode.NEW)
 			self.client_preferences.reset_dirty()
 		elif NotebookNode.DELETED in self._unsaved_changes:
@@ -1007,21 +1042,8 @@ class ContentNode(AbstractContentFolderNode):
 				for payload_name in list(self._payload_names_to_remove):
 					self._notebook_storage.remove_node_payload(self.node_id, payload_name)
 					self._payload_names_to_remove.remove(payload_name)
-				for payload_name, payload_data in self._payloads_to_store.items():
-					self._notebook_storage.add_node_payload(self.node_id, payload_name, io.BytesIO(payload_data))
-					del self._payloads_to_store[payload_name]
 				self._unsaved_changes.remove(ContentNode.PAYLOAD_CHANGE)
 	
-	def set_main_payload(self, payload_data):
-		"""TODO"""
-		self._payloads_to_store[self.main_payload_name] = payload_data
-		if self.main_payload_name not in self._payload_names_to_remove:
-			self._payload_names_to_remove.append(self.main_payload_name)
-		if NotebookNode.NEW not in self._unsaved_changes:
-			self._unsaved_changes.add(ContentNode.PAYLOAD_CHANGE)
-		
-		self.modified_time = datetime.now(tz=utc)
-
 	def __repr__(self):
 		return '{cls}[{node_id}, {content_type}, {_title}]'.format(
 				cls=self.__class__.__name__,

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from hashlib import md5
 import io
 import os
 import StringIO as stringio
@@ -14,7 +15,9 @@ DEFAULT_ATTRIBUTES = { 'title': DEFAULT_TITLE, 'key2': 'value2' }
 CONTENT_TYPE_HTML = 'text/html'
 DEFAULT_HTML_PAYLOAD_PATH = '../../../tests/data/content/index.html'
 DEFAULT_HTML_PAYLOAD_NAME = os.path.basename(DEFAULT_HTML_PAYLOAD_PATH)
+DEFAULT_HTML_PAYLOAD_HASH = 'a9226a5dff91867661a68906aa35ccc9'
 DEFAULT_PNG_PAYLOAD_PATH = '../../../tests/data/content/image1.png'
+DEFAULT_PNG_PAYLOAD_HASH = '2814638fbf565bb019bd4e77d091c9a8'
 DEFAULT_PNG_PAYLOAD_NAME = os.path.basename(DEFAULT_PNG_PAYLOAD_PATH)
 
 class StoredNotebookTest(unittest.TestCase):
@@ -39,16 +42,16 @@ class StoredNotebookTest(unittest.TestCase):
 
 class StoredNodeTest(unittest.TestCase):
     def test_object_fields_initialized(self):
-        node = StoredNode('id', 'text/html', { 'key': 'value' }, ['name'])
+        node = StoredNode('id', 'text/html', { 'key': 'value' }, [StoredNodePayload('name', 'hash')])
 
         self.assertEqual('id', node.node_id)
         self.assertEqual('text/html', node.content_type)
         self.assertEqual({ 'key': 'value' }, node.attributes)
-        self.assertEqual(['name'], node.payload_names)
+        self.assertEqual([StoredNodePayload('name', 'hash')], node.payloads)
 
     def test_equals(self):
-        node1 = create_stored_node(payload_names=['name'])
-        node1a = create_stored_node(payload_names=['name'])
+        node1 = create_stored_node([StoredNodePayload('name', 'hash')])
+        node1a = create_stored_node([StoredNodePayload('name', 'hash')])
 
         self.assertTrue(node1 == node1a)
         self.assertFalse(node1 != node1a)
@@ -56,7 +59,7 @@ class StoredNodeTest(unittest.TestCase):
         node2 = create_stored_node(node_id=None)
         node3 = create_stored_node(content_type=None)
         node4 = create_stored_node(attributes=None)
-        node5 = create_stored_node(payload_names=None)
+        node5 = create_stored_node(payloads=None)
 
         self.assertFalse(node1 == node2)
         self.assertFalse(node1 == node3)
@@ -78,8 +81,8 @@ class NotebookStorageTestBase(object):
         
         # Then read them.
         s = self.create_notebook_storage()
-        self.assertEqual(create_stored_node(i=1, payload_names=[]), s.get_node(id1))
-        self.assertEqual(create_stored_node(i=2, payload_names=[]), s.get_node(id2))
+        self.assertEqual(create_stored_node(i=1, payloads=[]), s.get_node(id1))
+        self.assertEqual(create_stored_node(i=2, payloads=[]), s.get_node(id2))
  
     def test_add_node_twice(self):
         s = self.create_notebook_storage()
@@ -90,11 +93,25 @@ class NotebookStorageTestBase(object):
     def test_add_node_character_encoding_and_escaping(self):
         # Add node first.
         s = self.create_notebook_storage()
-        id_ = add_node(s, content_type=u'<äëïöüß€&ש>', attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' }, payloads=[(u'äëïöüß€ש', stringio.StringIO(u'<äëïöüß€&ש> </text>'.encode('utf-8')))], payload_paths=[])
+        payload_data = u'<äëïöüß€&ש> </text>'
+        id_ = add_node(
+                s,
+                content_type=u'<äëïöüß€&ש>',
+                attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' },
+                payloads=[(u'äëïöüß€ש', stringio.StringIO(payload_data.encode('utf-8')))],
+                payload_paths=[]
+                )
  
         # Then read it.
         s = self.create_notebook_storage()
-        self.assertEquals(create_stored_node(content_type=u'<äëïöüß€&ש>', attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' }, payload_names=[u'äëïöüß€ש']), s.get_node(id_))
+        expected = StoredNode(
+                node_id=id_,
+                content_type=u'<äëïöüß€&ש>',
+                attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' },
+                payloads=[StoredNodePayload(u'äëïöüß€ש', md5(payload_data.encode('utf-8')).hexdigest())]
+                )
+        actual = s.get_node(id_)
+        self.assertEqual(expected, actual)
     
     def test_add_node_attributes_copied(self):
         attributes = { 'key': 'value' }
@@ -122,7 +139,7 @@ class NotebookStorageTestBase(object):
  
         # Then read them.
         s = self.create_notebook_storage()
-        self.assertEquals([create_stored_node(i=1), create_stored_node(i=2)], list(s.get_all_nodes()))
+        self.assertEqual([create_stored_node(i=1), create_stored_node(i=2)], list(s.get_all_nodes()))
 
     def test_has_node(self):
         s = self.create_notebook_storage()
@@ -168,7 +185,7 @@ class NotebookStorageTestBase(object):
         
         # Then read the node and payload.
         s = self.create_notebook_storage()
-        self.assertEqual(create_stored_node(i=1, payload_names=[DEFAULT_HTML_PAYLOAD_NAME]), s.get_node(id_))
+        self.assertEqual([StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH)], s.get_node(id_).payloads)
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME) as f2:
                 assert_file_object_equals(self, f1, f2)
@@ -224,7 +241,10 @@ class NotebookStorageTestBase(object):
         
         # Then read them.
         s = self.create_notebook_storage()
-        self.assertEqual(create_stored_node(payload_names=[DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_NAME]), s.get_node(id_))
+        self.assertEqual([
+                StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH),
+                StoredNodePayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH),
+                ], s.get_node(id_).payloads)
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME) as f2:
                 assert_file_object_equals(self, f1, f2)
@@ -252,6 +272,23 @@ class NotebookStorageTestBase(object):
         s = self.create_notebook_storage()
         self.assertFalse(s.has_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME))
 
+    def test_remove_and_add_node_payload(self):
+        s = self.create_notebook_storage()
+        id_ = add_node(s, i=1)
+        
+        # Add and remove payload first.
+        with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f:
+            s.add_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME, f)
+        s.remove_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME)
+   
+        # Then add it again.
+        with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f:
+            s.add_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME, f)
+        
+        # Then make sure it is there.
+        self.assertTrue(s.has_node_payload(id_, DEFAULT_HTML_PAYLOAD_NAME))
+        self.assertEqual(1, len(s.get_node(id_).payloads))
+    
     def test_remove_node_payload_nonexistent(self):
         s = self.create_notebook_storage()
         id_ = add_node(s, i=1)
@@ -275,7 +312,7 @@ class NotebookStorageTestBase(object):
         # Verify the attributes.
         s = self.create_notebook_storage()
         stored_node1=s.get_node(id_)
-        self.assertEquals(attributes1, stored_node1.attributes)
+        self.assertEqual(attributes1, stored_node1.attributes)
 
         # Update the attributes.
         s = self.create_notebook_storage()
@@ -284,7 +321,7 @@ class NotebookStorageTestBase(object):
         # Then make sure it is not there.
         s = self.create_notebook_storage()
         stored_node2=s.get_node(id_)
-        self.assertEquals(attributes2, stored_node2.attributes)
+        self.assertEqual(attributes2, stored_node2.attributes)
     
     def test_set_node_attributes_copied(self):
         attributes = { 'key': 'value' }
@@ -359,10 +396,11 @@ def add_node(
         payloads.append((payload_name, opened_file))
         opened_files.append(opened_file)
     
-    notebook_storage.add_node(node_id, content_type, attributes, payloads)
-    
-    for opened_file in opened_files:
-        opened_file.close()
+    try:
+        notebook_storage.add_node(node_id, content_type, attributes, payloads)
+    finally:
+        for opened_file in opened_files:
+            opened_file.close()
     
     return node_id
 
@@ -377,12 +415,12 @@ def create_stored_node(
         node_id=DEFAULT_ID,
         content_type=CONTENT_TYPE_HTML,
         attributes=DEFAULT_ATTRIBUTES,
-        payload_names=None
+        payloads=None
         ):
     
     if i is not None:
         node_id = node_id % i
-    if payload_names is None:
-        payload_names = []
+    if payloads is None:
+        payloads = []
         
-    return StoredNode(node_id, content_type, attributes, payload_names)
+    return StoredNode(node_id, content_type, attributes, payloads)

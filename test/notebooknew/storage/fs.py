@@ -6,7 +6,7 @@ import os
 from keepnote.notebooknew.storage import *
 from keepnote.notebooknew.storage.fs import *
 from test.base import TestBase
-from test.notebooknew.storage import DEFAULT_ID, DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_PATH, NotebookStorageTestBase, add_node, create_stored_node 
+from test.notebooknew.storage import DEFAULT_ID, DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_PATH, DEFAULT_HTML_PAYLOAD_HASH, NotebookStorageTestBase, add_node, create_stored_node 
 from test.utils import assert_file_object_equals
 
 class FileSystemStorageTest(TestBase, NotebookStorageTestBase):
@@ -121,7 +121,8 @@ class FileSystemStorageTest(TestBase, NotebookStorageTestBase):
             s.get_node(DEFAULT_ID)
     
     def test_fs_node_structure(self):
-        self.keep_tmpdir=True
+        #self.keep_tmpdir=True
+        
         # Create a node with payload.
         s = FileSystemStorage(dir=self.notebookdir)
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f:
@@ -159,7 +160,7 @@ class FileSystemStorageTest(TestBase, NotebookStorageTestBase):
         
         # Then read them.
         s = FileSystemStorage(dir=self.notebookdir)
-        self.assertEqual(create_stored_node(payload_names=['node.xml']), s.get_node(id_))
+        self.assertEqual(create_stored_node(payloads=[StoredNodePayload('node.xml', DEFAULT_HTML_PAYLOAD_HASH)]), s.get_node(id_))
         with io.open(DEFAULT_HTML_PAYLOAD_PATH, mode='rb') as f1:
             with s.get_node_payload(id_, 'node.xml') as f2:
                 assert_file_object_equals(self, f1, f2)

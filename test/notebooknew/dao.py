@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 
-import base64
 from datetime import datetime
 import io
-import os
 from pytz import utc
 import unittest
 
-from keepnote.notebooknew import Notebook, NotebookNode, ContentNode, FolderNode, TrashNode, IllegalOperationError
+from keepnote.notebooknew import Notebook, ContentNode, FolderNode, TrashNode, \
+		IllegalOperationError
 from keepnote.notebooknew import CONTENT_TYPE_HTML, CONTENT_TYPE_TRASH, CONTENT_TYPE_FOLDER
 from keepnote.notebooknew import new_node_id
 from keepnote.notebooknew.dao import *
 import keepnote.notebooknew.storage as storage
+from keepnote.notebooknew.storage import StoredNode, StoredNodePayload
+
+from test.notebooknew.testutils import *
 
 CONTENT_TYPE_TEST = u'application/x-notebook-test-node'
 
@@ -27,29 +29,7 @@ TITLE_COLOR_FOREGROUND_ATTRIBUTE = 'title_fgcolor'
 TITLE_COLOR_BACKGROUND_ATTRIBUTE = 'title_bgcolor'
 CLIENT_PREFERENCES_ATTRIBUTE = 'client_preferences'
 
-DEFAULT=object()
-DEFAULT_ID = 'my_id'
-DEFAULT_CONTENT_TYPE = CONTENT_TYPE_HTML
-DEFAULT_TITLE = 'my_title'
-DEFAULT_CREATED_TIMESTAMP = 1012615322
-DEFAULT_CREATED_TIME = datetime.fromtimestamp(DEFAULT_CREATED_TIMESTAMP, tz=utc)
-DEFAULT_MODIFIED_TIMESTAMP = 1020000000
-DEFAULT_MODIFIED_TIME = datetime.fromtimestamp(DEFAULT_MODIFIED_TIMESTAMP, tz=utc)
-DEFAULT_ORDER = 12
-DEFAULT_ICON_NORMAL = 'node_red_closed.png'
-DEFAULT_ICON_OPEN = 'node_red_open.png'
-DEFAULT_TITLE_COLOR_FOREGROUND = '#ffffff'
-DEFAULT_TITLE_COLOR_BACKGROUND = '#ff0000'
-DEFAULT_CLIENT_PREFERENCES = { 'test': { 'key': 'value' }}
-DEFAULT_PAYLOAD_NAMES = ['my_payload1', 'my_payload2']
-DEFAULT_HTML_PAYLOAD_NAME = os.path.basename('index.html')
-DEFAULT_HTML_PAYLOAD = base64.b64decode('PCFET0NUWVBFIGh0bWw+DQoNCjxoMT5UZXN0IE5vZGU8L2gxPg0KPHA+VGhpcyBpcyBhIG5vZGUgdXNlZCBmb3IgdGVzdGluZy48L3A+DQo=')
-DEFAULT_PNG_PAYLOAD_NAME = os.path.basename('image1.png')
-DEFAULT_PNG_PAYLOAD = base64.b64decode('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')
-DEFAULT_JPG_PAYLOAD_NAME = os.path.basename('image2.jpg')
-DEFAULT_JPG_PAYLOAD = base64.b64decode('/9j/4AAQSkZJRgABAQEAYwBjAAD/4QBmRXhpZgAATU0AKgAAAAgABAEaAAUAAAABAAAAPgEbAAUAAAABAAAARgEoAAMAAAABAAMAAAExAAIAAAAQAAAATgAAAAAAAJhXAAAD6AAAmFcAAAPocGFpbnQubmV0IDQuMC41AP/bAEMAAgEBAgEBAgICAgICAgIDBQMDAwMDBgQEAwUHBgcHBwYHBwgJCwkICAoIBwcKDQoKCwwMDAwHCQ4PDQwOCwwMDP/bAEMBAgICAwMDBgMDBgwIBwgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDP/AABEIABcAIAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/APvzRNBs9S1NZJIGVMFSVzhWHC54HHBP41X0ya18T3McdosjszbREwwyg4ALbh29TgY71kfF/wCOujfDrwLfWuktJq3iiZJobHSrd/8ASLm4GNysoOVUdSzEKAQxO35q0/2bnjufhzo8kNnaabcyWRge3RgDE0YEbdBhsFTz3znPNfMYTEww04whaUtW9P6/I9DEYOdeg6s7xWiWv5rr9+5k/GO90L4R+G0i164SzuLq9gtxc+YFSPdPGPlcgqODnJGcBiOlaHhe9h8XeFo7m223drlltZ4G3m5RGKbmPHzZU52ggnPHavGP2uvib4fuNX1Dw/8A8Jhpmm+KdJsIb+ysJLFp11Nl3ypEJtp8v7ueBjD85Aq78Lv2idK1T4hxx2GnWeiNfMbS4ja5MgmUSSbGChF5OMqTg4J964q2c1vrHtWlZ6XW/wA/6R308jh9U5Lu61s9vl/TPP8A4M/ALxT4b8Mx3nie+GveMNRYzPO1/JF9gCoqIvmqCzsfn3nkECNVwqAV3ds+teBJpdQ0G4vtXvpw9mYrjUZPnVzkjc/CjKknHJPQ0UV8ZGtL2j+f6H0tSvJxV9n06Hj3xA/ZDvPiD4xt9X1fbbzSxKJE+1NOGcEgABidi42ggM3O4gjOKz4vggP2c70Xkr+JNc3N9osjFcofskygoobzJ0J3Bzkj+6OnOSis8POUua52VMXUfLB7H//Z')
-
-# The following StorageNodes and NotebookNodes have the following structure:
+# The following StoredNodes and NotebookNodes have the following structure:
 # root
 #   child1
 #     child11
@@ -57,14 +37,14 @@ DEFAULT_JPG_PAYLOAD = base64.b64decode('/9j/4AAQSkZJRgABAQEAYwBjAAD/4QBmRXhpZgAA
 #       child121
 #   child2
 #     child21
-ROOT_SN = StorageNode('root_id', CONTENT_TYPE_TEST, attributes={TITLE_ATTRIBUTE: 'root'}, payloads=[])
-CHILD1_SN = StorageNode('child1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child1'}, payloads=[])
-CHILD11_SN = StorageNode('child11_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child11'}, payloads=[])
-CHILD12_SN = StorageNode('child12_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child12'}, payloads=[])
-CHILD121_SN = StorageNode('child121_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child12_id', TITLE_ATTRIBUTE: 'child121'}, payloads=[])
-CHILD2_SN = StorageNode('child2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child2'}, payloads=[])
-CHILD21_SN = StorageNode('child21_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payloads=[])
-TRASH_SN = StorageNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payloads=[])
+ROOT_SN = StoredNode('root_id', CONTENT_TYPE_TEST, attributes={TITLE_ATTRIBUTE: 'root'}, payloads=[])
+CHILD1_SN = StoredNode('child1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child1'}, payloads=[])
+CHILD11_SN = StoredNode('child11_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child11'}, payloads=[])
+CHILD12_SN = StoredNode('child12_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child12'}, payloads=[])
+CHILD121_SN = StoredNode('child121_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child12_id', TITLE_ATTRIBUTE: 'child121'}, payloads=[])
+CHILD2_SN = StoredNode('child2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child2'}, payloads=[])
+CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payloads=[])
+TRASH_SN = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payloads=[])
 
 def add_storage_node(notebook_storage, sn):
 	notebook_storage.add_node(
@@ -245,8 +225,8 @@ class StructureTest:#(unittest.TestCase):
 	
 	def test_validation_two_roots(self):
 		"""Test a NotebookStorage with two roots."""
-		root1_sn = StorageNode('root1_id', CONTENT_TYPE_TEST, attributes={}, payloads=[])
-		root2_sn = StorageNode('root2_id', CONTENT_TYPE_TEST, attributes={}, payloads=[])
+		root1_sn = StoredNode('root1_id', CONTENT_TYPE_TEST, attributes={}, payloads=[])
+		root2_sn = StoredNode('root2_id', CONTENT_TYPE_TEST, attributes={}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, root1_sn)
@@ -259,7 +239,7 @@ class StructureTest:#(unittest.TestCase):
 	
 	def test_validation_unknown_parent(self):
 		"""Test a NotebookStorage with a root and a node that references an unknown parent."""
-		child_sn = StorageNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'unknown_id'}, payloads=[])
+		child_sn = StoredNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'unknown_id'}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -272,7 +252,7 @@ class StructureTest:#(unittest.TestCase):
 	
 	def test_validation_parent_is_node_a_child(self):
 		"""Test a NotebookStorage with a root and a node that is its own parent."""
-		child_sn = StorageNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payloads=[])
+		child_sn = StoredNode('child_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'child_id'}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -285,8 +265,8 @@ class StructureTest:#(unittest.TestCase):
 	
 	def test_validation_cycle_no_root(self):
 		"""Test a NotebookStorage with a cycle and no root."""
-		cycle_node1_sn = StorageNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payloads=[])
-		cycle_node2_sn = StorageNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payloads=[])
+		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payloads=[])
+		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, cycle_node1_sn)
@@ -299,9 +279,9 @@ class StructureTest:#(unittest.TestCase):
 	
 	def test_validation_cycle_with_root(self):
 		"""Test a NotebookStorage with a root and a cycle."""
-		cycle_node1_sn = StorageNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node3_id'}, payloads=[])
-		cycle_node2_sn = StorageNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payloads=[])
-		cycle_node3_sn = StorageNode('cycle_node3_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payloads=[])
+		cycle_node1_sn = StoredNode('cycle_node1_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node3_id'}, payloads=[])
+		cycle_node2_sn = StoredNode('cycle_node2_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node1_id'}, payloads=[])
+		cycle_node3_sn = StoredNode('cycle_node3_id', CONTENT_TYPE_TEST, attributes={PARENT_ID_ATTRIBUTE: 'cycle_node2_id'}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -317,8 +297,8 @@ class StructureTest:#(unittest.TestCase):
 
 	def test_validation_two_trashes(self):
 		"""Test a NotebookStorage with two trashes."""
-		trash1_sn = StorageNode('trash1_id', CONTENT_TYPE_TRASH, attributes={}, payloads=[])
-		trash2_sn = StorageNode('trash2_id', CONTENT_TYPE_TRASH, attributes={}, payloads=[])
+		trash1_sn = StoredNode('trash1_id', CONTENT_TYPE_TRASH, attributes={}, payloads=[])
+		trash2_sn = StoredNode('trash2_id', CONTENT_TYPE_TRASH, attributes={}, payloads=[])
 		
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -443,7 +423,7 @@ class ContentFolderTrashNodeTest():
 			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
 			client_preferences=DEFAULT_CLIENT_PREFERENCES,
 			):
-		"""Creates a StorageNode of the class under test."""
+		"""Creates a StoredNode of the class under test."""
 		raise NotImplementedError()
 		
 	def _create_notebook_node(
@@ -477,7 +457,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -501,7 +481,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -514,7 +494,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.move(other_node)
@@ -544,7 +524,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -556,7 +536,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.title = 'new title'
@@ -580,13 +560,26 @@ class ContentFolderTrashNodeTest():
 	def test_title_changed_in_remote(self):
 		self.fail()
 	
+	@unittest.skip('TODO')
+	def test_title_missing_in_remote(self):
+		sn = self._create_storage_node(title=None, parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertIsNotNone(notebook.get_node_by_id(sn.node_id).title)
+	
 	def test_created_time_new_in_local(self):
 		root = TestNotebookNode()
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -614,7 +607,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -626,7 +619,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.modified_time = datetime.now(tz=utc)
@@ -656,7 +649,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -668,7 +661,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.icon_normal = 'icon_new.png'
@@ -698,7 +691,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -710,7 +703,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.icon_open = 'icon_new.png'
@@ -740,7 +733,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -752,7 +745,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.title_color_foreground = '#c0c0c0'
@@ -782,7 +775,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -794,7 +787,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.title_color_background = '#c0c0c0'
@@ -826,7 +819,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -840,7 +833,7 @@ class ContentFolderTrashNodeTest():
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.client_preferences.get('test', 'key', define=True)
@@ -898,13 +891,13 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		if parent is not None:
 			attributes[PARENT_ID_ATTRIBUTE] = parent.node_id
 		
-		node = StorageNode(
+		node = StoredNode(
 			node_id=new_node_id(),
 			content_type=content_type,
 			attributes=attributes,
 			payloads=[
-					StorageNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD),
-					StorageNodePayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD),
+					StoredNodePayloadWithData(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH, DEFAULT_HTML_PAYLOAD_DATA),
+					StoredNodePayloadWithData(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH, DEFAULT_PNG_PAYLOAD_DATA),
 					]
 			)
 		
@@ -927,10 +920,13 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			modified_time=DEFAULT,
 			main_payload=DEFAULT,
 			additional_payloads=DEFAULT,
-			main_payload_name=DEFAULT,
-			additional_payload_names=DEFAULT,
 			add_to_parent=None,
 			):
+		
+		if main_payload is DEFAULT:
+			main_payload = TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA)
+		if additional_payloads is DEFAULT:
+			additional_payloads = [TestPayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA)]
 		
 		if loaded_from_storage:
 			if main_payload is DEFAULT:
@@ -943,25 +939,13 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 				created_time = DEFAULT_CREATED_TIME
 			if modified_time is DEFAULT:
 				modified_time = DEFAULT_MODIFIED_TIME
-			if main_payload_name is DEFAULT:
-				main_payload_name = DEFAULT_HTML_PAYLOAD_NAME
-			if additional_payload_names is DEFAULT:
-				additional_payload_names = [DEFAULT_PNG_PAYLOAD_NAME]
 		else:
-			if main_payload is DEFAULT:
-				main_payload = (DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD)
-			if additional_payloads is DEFAULT:
-				additional_payloads = [(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD)]
 			if node_id is DEFAULT:
 				node_id = None
 			if created_time is DEFAULT:
 				created_time = None
 			if modified_time is DEFAULT:
 				modified_time = None
-			if main_payload_name is DEFAULT:
-				main_payload_name = None
-			if additional_payload_names is DEFAULT:
-				additional_payload_names = None
 		
 		node = ContentNode(
 				notebook_storage=None,
@@ -980,8 +964,6 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 				node_id=node_id,
 				created_time=created_time,
 				modified_time=modified_time,
-				main_payload_name=main_payload_name,
-				additional_payload_names=additional_payload_names
 				)
 		if parent is not None:
 			if add_to_parent is None:
@@ -1013,8 +995,8 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 						TITLE_COLOR_BACKGROUND_ATTRIBUTE: DEFAULT_TITLE_COLOR_BACKGROUND,
 						},
 				payloads=[
-						(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD)),
-						(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))
+						(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)),
+						(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA))
 						]
 				)
 		notebook = Notebook()
@@ -1038,27 +1020,6 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 # 		self.assertEqual(DEFAULT_HTML_PAYLOAD_NAME, node.main_payload_name)
 # 		self.assertEqual([DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(False, node.is_dirty)
-	
-	def test_load_content_node_missing_title(self):
-		"""Test loading a content node without a title."""
-		
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(
-				node_id=DEFAULT_ID,
-				content_type=CONTENT_TYPE_HTML,
-				attributes={
-						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
-						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
-				)
-		notebook = Notebook()
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), ContentNodeDao() ])
-		
-		dao.sync()
-		
-		# Verify the node.
-		node = notebook.root
-		self.assertIsNotNone(node.title)
 	
 	def test_load_content_node_missing_payload(self):
 		"""Test loading a content node without payload."""
@@ -1088,7 +1049,7 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 				attributes={
 						TITLE_ATTRIBUTE: DEFAULT_TITLE,
 						},
-				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD))]
+				payloads=[(DEFAULT_HTML_PAYLOAD_NAME, io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA))]
 				)
 		notebook = Notebook()
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), ContentNodeDao() ])
@@ -1107,16 +1068,89 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 						MAIN_PAYLOAD_NAME_ATTRIBUTE: DEFAULT_HTML_PAYLOAD_NAME,
 						TITLE_ATTRIBUTE: DEFAULT_TITLE,
 						},
-				payloads=[(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD))]
+				payloads=[(DEFAULT_PNG_PAYLOAD_NAME, io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA))]
 				)
 		notebook = Notebook()
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), ContentNodeDao() ])
 		
 		with self.assertRaises(InvalidStructureError):
 			dao.sync()
+	
+	def test_main_payload_new_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA), additional_payloads=[], parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		
+		dao.sync()
+		
+		self.assertEqual(node.main_payload_name, notebook_storage.get_node(node.node_id).attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE])
+		self.assertEqual([StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH)], notebook_storage.get_node(node.node_id).payloads)
+		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
+	
+	def test_main_payload_changed_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA), additional_payloads=[], parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		with node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open('w') as f:
+			f.write(DEFAULT_PNG_PAYLOAD_DATA)
+		dao.sync()
+		
+		self.assertEqual([StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH)], notebook_storage.get_node(node.node_id).payloads)
+		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
+	
 
 
-class FolderNodeTest:#(unittest.TestCase):
+class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
+	def test_read(self):
+		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
+		payload = ReadFromStorageWriteToMemoryPayload(
+				name=DEFAULT_HTML_PAYLOAD_NAME,
+				original_reader=original_reader,
+				original_md5hash=DEFAULT_HTML_PAYLOAD_HASH,
+				)
+		
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, payload.open(mode='r').read())
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.md5hash)
+	
+	def test_write(self):
+		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
+		payload = ReadFromStorageWriteToMemoryPayload(
+				name=DEFAULT_HTML_PAYLOAD_NAME,
+				original_reader=original_reader,
+				original_md5hash=DEFAULT_HTML_PAYLOAD_HASH,
+				)
+		
+		with payload.open(mode='w') as f:
+			f.write(DEFAULT_PNG_PAYLOAD_DATA)
+		
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_DATA, payload.open(mode='r').read())
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.md5hash)
+	
+	def test_reset(self):
+		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
+		payload = ReadFromStorageWriteToMemoryPayload(
+				name=DEFAULT_HTML_PAYLOAD_NAME,
+				original_reader=original_reader,
+				original_md5hash=DEFAULT_HTML_PAYLOAD_HASH,
+				)
+		
+		with payload.open(mode='w') as f:
+			f.write(DEFAULT_PNG_PAYLOAD_DATA)
+		payload.reset()
+		
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, payload.open(mode='r').read())
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.md5hash)
+
+
+class FolderNodeTest:#(unittest.TestCase): # TODO
 	def test_load_folder_node(self):
 		"""Test loading a folder node."""
 		
@@ -1181,7 +1215,7 @@ class FolderNodeTest:#(unittest.TestCase):
 		self.assertIsNotNone(node.title)	
 	
 
-class TrashNodeTest:#(unittest.TestCase):
+class TrashNodeTest:#(unittest.TestCase): # TODO
 	def test_load_trash_node(self):
 		"""Test loading a trash node."""
 		
@@ -1254,18 +1288,11 @@ class TestNotebookNodeDao(NotebookNodeDao):
 	def nn_to_sn(self, nn):
 		attributes = {
 				TITLE_ATTRIBUTE: nn.title,
-# 				ICON_NORMAL_ATTRIBUTE: nn.icon_normal,
-# 				ICON_OPEN_ATTRIBUTE: nn.icon_open,
-# 				CLIENT_PREFERENCES_ATTRIBUTE: self.client_preferences._data,
 				}
 		if nn.parent is not None:
 			attributes[PARENT_ID_ATTRIBUTE] = nn.parent.node_id
-# 		if nn.created_time is not None:
-# 			attributes[CREATED_TIME_ATTRIBUTE] = datetime_to_timestamp(nn.created_time)
-# 		if nn.modified_time is not None:
-# 			attributes[MODIFIED_TIME_ATTRIBUTE] = datetime_to_timestamp(nn.modified_time)
 		
-		return StorageNode(nn.node_id, nn.content_type, attributes, [])
+		return StoredNode(nn.node_id, nn.content_type, attributes, [])
 	
 	def sn_to_nn(self, sn, notebook_storage, notebook):
 		return TestNotebookNode(
@@ -1273,77 +1300,6 @@ class TestNotebookNodeDao(NotebookNodeDao):
 				notebook=notebook,
 				parent=None,
 				loaded_from_storage=True,
-				title='',
-# 				order=order,
-# 				icon_normal=icon_normal,
-# 				icon_open=icon_open,
-# 				title_color_foreground=title_color_foreground,
-# 				title_color_background=title_color_background,
+				title=sn.attributes[TITLE_ATTRIBUTE],
 				node_id=sn.node_id,
-# 				created_time=created_time,
-# 				modified_time=modified_time,
 				)
-
-class TestNotebookNode(NotebookNode):
-	"""A testing implementation of NotebookNode."""
-
-	def __init__(self, notebook_storage=None, notebook=None, parent=None, add_to_parent=None, loaded_from_storage=True, title=DEFAULT_TITLE, node_id=None):
-		if node_id is None:
-			node_id = new_node_id()
-		super(TestNotebookNode, self).__init__(
-				notebook_storage=notebook_storage,
-				notebook=notebook,
-				content_type=u'application/x-notebook-test',
-				parent=parent,
-				loaded_from_storage=loaded_from_storage,
-				title=title,
-				node_id=node_id,
-				)
-		
-		self._is_deleted = False
-		self._is_dirty = False
-		self._is_in_trash = False
-		
-		if self.parent is not None:
-			if add_to_parent is None:
-				raise IllegalOperationError('Please pass add_to_parent')
-			elif add_to_parent == True:
-				self.parent._add_child_node(self)
-	
-	def delete(self):
-		if self.parent is None:
-			raise IllegalOperationError('Cannot delete the root node')
-		for child in self._children:
-			child.delete()
-		self.is_deleted = True
-		if NotebookNode.NEW in self._unsaved_changes:
-			self.parent._remove_child_node(self)
-			self._unsaved_changes.remove(NotebookNode.NEW)
-		else:
-			self._unsaved_changes.add(NotebookNode.DELETED)
-	
-	@property
-	def is_dirty(self):
-		return self._is_dirty
-	
-	@property
-	def is_in_trash(self):
-		return False
-	
-	@property
-	def is_root(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
-	
-	@property
-	def is_trash(self):
-		return False
-	
-	def set_is_deleted(self, value):
-		self.is_deleted = value
-	
-	def set_is_dirty(self, value):
-		self._is_dirty = value
-	
-	def set_is_in_trash(self, value):
-		self._is_in_trash = value

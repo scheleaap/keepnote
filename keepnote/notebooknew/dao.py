@@ -2,18 +2,23 @@
 
 from collections import namedtuple
 from datetime import datetime
+from functools import partial
+import hashlib
+import io
 from pytz import utc
 import sys
 
-from keepnote.notebooknew import NotebookNode, ContentNode, FolderNode, TrashNode, CONTENT_TYPE_FOLDER, CONTENT_TYPE_TRASH
+from keepnote.notebooknew import ContentNode, FolderNode, TrashNode, CONTENT_TYPE_FOLDER, CONTENT_TYPE_TRASH,\
+	NotebookNodePayload
+from keepnote.notebooknew.storage import StoredNode, StoredNodePayload
 
 __all__ = [
 		'Dao',
-		'StorageNode',
-		'StorageNodePayload',
 		'NotebookNodeDao',
 		'ContentNodeDao',
 		'FolderNodeDao',
+		'StoredNodePayloadWithData',
+		'ReadFromStorageWriteToMemoryPayload',
 		'TrashNodeDao',
 		'InvalidStructureError',
 		]
@@ -59,42 +64,11 @@ def get_attribute_value(attribute_definition, attributes):
 		return attribute_definition.default
 
 
-class StorageNode(object):
-	"""Represents a node that is or can be stored in a NotebookStorage."""
-
-	def __init__(self, node_id, content_type, attributes, payloads):
-		"""Constructor.
-		
-		@param node_id: The id of the new node.
-		@param content_type: The content type of the node.
-		@param attributes: The attributes of the node.
-		@param payloads: The payloads of the node.
-		"""
-		self.node_id = node_id
-		self.content_type = content_type
-		self.attributes = attributes
-		self.payloads = payloads
+class StoredNodePayloadWithData(StoredNodePayload):
+	"""Contains payload metadata and optionally the payload data of a StoredNode."""
 	
-	def __eq__(self, other):
-		return \
-			isinstance(other, StorageNode) and \
-			self.node_id == other.node_id and \
-			self.content_type == other.content_type and \
-			self.attributes == other.attributes and \
-			self.payloads == other.payloads
-	
-	def __ne__(self, other):
-		return not self.__eq__(other);
-	
-	def __repr__(self):
-		return 'StorageNode[{node_id}, {content_type}, {attributes}, {payloads}]'.format(**self.__dict__)
-
-
-class StorageNodePayload(object):
-	"""Contains payload metadata and optionally the payload itself of a StorageNode."""
-	
-	def __init__(self, name, data):
-		self.name = name
+	def __init__(self, name, md5hash, data):
+		super(StoredNodePayloadWithData, self).__init__(name, md5hash)
 		self.data = data
 	
 	def has_data(self):
@@ -102,15 +76,16 @@ class StorageNodePayload(object):
 	
 	def __eq__(self, other):
 		return \
-			isinstance(other, StorageNodePayload) and \
+			isinstance(other, StoredNodePayloadWithData) and \
 			self.name == other.name and \
+			self.md5hash == other.md5hash and \
 			self.data == other.data
 	
 	def __ne__(self, other):
 		return not self.__eq__(other);
 	
 	def __repr__(self):
-		return 'StorageNodePayload[{name}]'.format(**self.__dict__)
+		return 'StoredNodePayloadWithData[{name}, {md5hash}, has_data={has_data}]'.format(has_data=self.has_data(), **self.__dict__)
 
 
 class Dao(object):
@@ -128,11 +103,11 @@ class Dao(object):
 	def sync(self):
 		now = datetime.now(tz=utc)
 		
-		# Load all remote StorageNodes.
+		# Load all remote StoredNodes.
 		remote_sns_by_id = { sn.node_id: sn for sn in self._notebook_storage.get_all_nodes() }
 		remote_ids = set(remote_sns_by_id.iterkeys())
 		
-		# Load all local NotebookNode and convert them to StorageNodes.
+		# Load all local NotebookNode and convert them to StoredNodes.
 		local_sns_by_id = { nn.node_id: self._convert_nn_to_sn(nn) for nn in self._notebook._traverse_tree() if not nn.is_deleted }
 		local_ids = set(local_sns_by_id.iterkeys())
 		
@@ -149,7 +124,13 @@ class Dao(object):
 			local_sn = local_sns_by_id[node_id]
 			if remote_sn != local_sn:
 				# We're assuming only local changes can happen.
+				
 				self._notebook_storage.set_node_attributes(node_id, local_sn.attributes)
+				for local_payload in local_sn.payloads:
+					if remote_sn.has_payload(local_payload.name) and remote_sn.get_payload(local_payload.name).md5hash != local_payload.md5hash:
+						# TODO: Replace with set_payload() or update_node()
+						self._notebook_storage.remove_node_payload(node_id, local_payload.name)
+						self._notebook_storage.add_node_payload(node_id, local_payload.name, local_payload.data())
 		
 		self._last_local_node_versions = local_sns_by_id.keys()
 		
@@ -161,8 +142,8 @@ class Dao(object):
 					node_id=sn.node_id,
 					content_type=sn.content_type,
 					attributes=sn.attributes,
-# 					payloads=sn.payloads)
-					payloads=[])
+					payloads=[ (payload.name, payload.data()) for payload in sn.payloads]
+					)
 	
 	def _add_new_in_remote_to_local(self, sns_by_id, node_ids):
 		# Create NotebookNodes for all StoredNotes and index all StoredNotes and NotebookNodes by id.
@@ -237,7 +218,7 @@ class Dao(object):
 			if node_dao.accepts(nn.content_type):
 				sn = node_dao.nn_to_sn(nn)
 				return sn
-		raise StorageNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
+		raise StoredNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
 				content_type=sn.content_type))
 		
 	def _convert_sn_to_nn(self, sn):
@@ -245,7 +226,7 @@ class Dao(object):
 			if node_dao.accepts(sn.content_type):
 				nn = node_dao.sn_to_nn(sn, self._notebook_storage, self._notebook)
 				return nn
-		raise StorageNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
+		raise StoredNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
 				content_type=sn.content_type))
 	
 	def _remove_deleted_in_local_from_remote(self, node_ids):
@@ -277,7 +258,7 @@ class ContentNodeDao(NotebookNodeDao):
 	
 	def nn_to_sn(self, nn):
 		attributes = {
-# 				MAIN_PAYLOAD_NAME_ATTRIBUTE.key: nn.main_payload_name,
+				MAIN_PAYLOAD_NAME_ATTRIBUTE.key: nn.main_payload_name,
 				TITLE_ATTRIBUTE.key: nn.title,
 				CLIENT_PREFERENCES_ATTRIBUTE.key: nn.client_preferences._data,
 				}
@@ -296,7 +277,15 @@ class ContentNodeDao(NotebookNodeDao):
 		if nn.modified_time is not None:
 			attributes[MODIFIED_TIME_ATTRIBUTE.key] = datetime_to_timestamp(nn.modified_time)
 		
-		return StorageNode(nn.node_id, nn.content_type, attributes, [])
+		payloads = []
+		for payload in nn.payloads.itervalues():
+			payloads.append(StoredNodePayloadWithData(
+					name=payload.name,
+					md5hash=payload.get_md5hash(),
+					data=partial(payload.open, mode='r'),
+					))
+		
+		return StoredNode(nn.node_id, nn.content_type, attributes, payloads=payloads)
 	
 	def sn_to_nn(self, sn, notebook_storage, notebook):
 		title = get_attribute_value(TITLE_ATTRIBUTE, sn.attributes)
@@ -309,7 +298,7 @@ class ContentNodeDao(NotebookNodeDao):
 		title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, sn.attributes)
 		client_preferences = get_attribute_value(CLIENT_PREFERENCES_ATTRIBUTE, sn.attributes)
 		
-		if not sn.payload_names:
+		if not sn.payloads:
 			raise InvalidStructureError('Content node {node_id} has no payload'.format(
 					node_id=sn.node_id))
 			
@@ -319,13 +308,25 @@ class ContentNodeDao(NotebookNodeDao):
 			raise InvalidStructureError('Missing attribute \'{attribute}\' in content node {node_id}'.format(
 					node_id=sn.node_id,
 					attribute=MAIN_PAYLOAD_NAME_ATTRIBUTE.key))
-		elif main_payload_name not in sn.payload_names:
+		elif main_payload_name not in [ payload.name for payload in sn.payloads ]:
 			raise InvalidStructureError(
 					'The main payload with name \'{main_payload_name}\' is missing in content node {node_id}'.format(
 							node_id=sn.node_id,
 							main_payload_name=main_payload_name))
 		
-		additional_payload_names = [payload_name for payload_name in sn.payload_names if payload_name != main_payload_name]
+		main_payload = ReadFromStorageWriteToMemoryPayload(
+				name=main_payload_name,
+				original_reader=lambda: notebook_storage.get_node_payload('whatev', 'dog'),#sn.node_id, main_payload_name),
+				original_md5hash='whazzup',
+				)
+		additional_payloads = [
+				ReadFromStorageWriteToMemoryPayload(
+						name=additional_payload_name,
+						original_reader=lambda: notebook_storage.get_node_payload('whatev', 'dog'),#(sn.node_id, additional_payload_name),
+						original_md5hash='whazzup',
+						)
+				for additional_payload_name in sn.payloads if additional_payload_name != main_payload_name
+				]
 		nn = ContentNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
@@ -339,11 +340,11 @@ class ContentNodeDao(NotebookNodeDao):
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
 				client_preferences=client_preferences,
+				main_payload=main_payload,
+				additional_payloads=additional_payloads,
 				node_id=sn.node_id,
 				created_time=created_time,
 				modified_time=modified_time,
-				main_payload_name=main_payload_name,
-				additional_payload_names=additional_payload_names,
 				)
 		
 		return nn
@@ -382,6 +383,60 @@ class FolderNodeDao(NotebookNodeDao):
 				)
 		
 		return nn
+
+
+class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
+	"""A NotebookNodePayload that returns the original payload data or the changed data if the payload has been written.
+
+	open(mode='r') will return the result of original_reader() als long as open(mode='w') has not been called or if
+	reset() has been called afterwards. Otherwise, it will return the last data that was written using open(mode='w').
+	
+	The changed payload data is kept in memory.
+	
+	@ivar name: The name of the payload.
+	@ivar md5hash: The name of the payload.
+	"""
+	
+	class CapturingBytesIO(io.BytesIO):
+		def __init__(self, on_close_handler, *args, **kwargs):
+			super(ReadFromStorageWriteToMemoryPayload.CapturingBytesIO, self).__init__(*args, **kwargs)
+			self.on_close_handler = on_close_handler
+		
+		def close(self, *args, **kwargs):
+			self.on_close_handler(self.getvalue())
+			return io.BytesIO.close(self, *args, **kwargs)
+	
+	def __init__(self, name, original_reader, original_md5hash):
+		"""Constructor.
+		
+		@param name: The name of the payload.
+		@param original_reader: A function that returns a file-like object containing the original payload data.
+		@param original_md5hash: The hash of the original payload data.
+		""" 
+		super(ReadFromStorageWriteToMemoryPayload, self).__init__(
+				name=name,
+				)
+		self.original_reader = original_reader
+		self.original_md5hash = original_md5hash
+		self.new_data = None
+		self.md5hash = self.original_md5hash
+	
+	def open(self, mode='r'):
+		if mode == 'w':
+			def on_close(new_data):
+				self.new_data = new_data
+				self.md5hash = hashlib.md5(self.new_data).hexdigest()
+			return ReadFromStorageWriteToMemoryPayload.CapturingBytesIO(on_close)
+		else:
+			if self.new_data is not None:
+				return io.BytesIO(self.new_data)
+			else:
+				return self.original_reader()
+	
+	def reset(self):
+		"""Removes the new data."""
+		self.new_data = None
+		self.md5hash = self.original_md5hash
 
 
 class TrashNodeDao(NotebookNodeDao):
@@ -427,5 +482,5 @@ class InvalidStructureError(DaoError):
 	pass
 
 
-class StorageNodeConversionError(DaoError):
+class StoredNodeConversionError(DaoError):
 	pass
