@@ -131,13 +131,27 @@ class Dao(object):
 			if remote_sn != local_sn:
 				# We're assuming only local changes can happen.
 				
+				presence = [
+						(payload_name, local_sn.has_payload(payload_name), remote_sn.has_payload(payload_name))
+						for payload_name
+						in set([p.name for p in local_sn.payloads]) | set([p.name for p in remote_sn.payloads])
+						]
+				
 				self._notebook_storage.set_node_attributes(node_id, local_sn.attributes)
-				for local_payload in local_sn.payloads:
-					if remote_sn.has_payload(local_payload.name) and remote_sn.get_payload(local_payload.name).md5hash != local_payload.md5hash:
-						# TODO: Replace with set_payload() or update_node()
-						self._notebook_storage.remove_node_payload(node_id, local_payload.name)
-						with local_payload.get_data() as f:
-							self._notebook_storage.add_node_payload(node_id, local_payload.name, f)
+				for payload_name, in_local, in_remote in presence:
+					if in_local and not in_remote:
+						with local_sn.get_payload(payload_name).get_data() as f:
+							self._notebook_storage.add_node_payload(node_id, payload_name, f)
+					elif in_local and in_remote:
+						local_payload = local_sn.get_payload(payload_name)
+						remote_payload = remote_sn.get_payload(payload_name)
+						if remote_payload.md5hash != local_payload.md5hash:
+							# TODO: Replace with set_payload() or update_node()
+							self._notebook_storage.remove_node_payload(node_id, local_payload.name)
+							with local_payload.get_data() as f:
+								self._notebook_storage.add_node_payload(node_id, local_payload.name, f)
+					elif not in_local and in_remote:
+						self._notebook_storage.remove_node_payload(node_id, payload_name)
 		
 		self._last_local_node_versions = local_sns_by_id.keys()
 		
@@ -328,16 +342,16 @@ class ContentNodeDao(NotebookNodeDao):
 		
 		main_payload = ReadFromStorageWriteToMemoryPayload(
 				name=main_payload_name,
-				original_reader=lambda: notebook_storage.get_node_payload(sn.node_id, main_payload_name),
-				original_md5hash='whazzup',
+				original_reader=partial(notebook_storage.get_node_payload, sn.node_id, main_payload_name),
+				original_md5hash='whazzup', # TODO
 				)
 		additional_payloads = [
 				ReadFromStorageWriteToMemoryPayload(
-						name=additional_payload_name,
-						original_reader=lambda: notebook_storage.get_node_payload('whatev', 'dog'),#(sn.node_id, additional_payload_name),
-						original_md5hash='whazzup',
+						name=payload.name,
+						original_reader=partial(notebook_storage.get_node_payload, sn.node_id, payload.name),
+						original_md5hash='whazzup', # TODO
 						)
-				for additional_payload_name in sn.payloads if additional_payload_name != main_payload_name
+				for payload in sn.payloads if payload.name != main_payload_name
 				]
 		nn = ContentNode(
 				notebook_storage=notebook_storage,

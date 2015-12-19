@@ -1,7 +1,6 @@
 Do something more intelligent in the test_validation_*() methods
 Create root node after first sync
 Create trash on first delete
-Implement payload hash in NotebookStorage
 Implement node timestamp in NotebookStorage
 Implement new in local, new in remote, changed in local sync
 x	content_type
@@ -15,20 +14,8 @@ x	icon_open
 x	title_fgcolor
 x	title_bgcolor
 x	client_preferences
-	payload
-x		test_main_payload_new_in_local
-x		test_main_payload_changed_in_local
-x		test_main_payload_new_in_remote
-/		test_main_payload_changed_in_remote
-		test_additional_payloads_new_in_local
-		test_additional_payloads_added_in_local
-		test_additional_payloads_changed_in_local
-		test_additional_payloads_removed_in_local
-		test_additional_payloads_new_in_remote
-		test_additional_payloads_added_in_remote
-		test_additional_payloads_changed_in_remote
-		test_additional_payloads_removed_in_remote
+x	payload
 Implement changed in remote sync
 	all attributes
 	payload
-Implement test_deleted_in_remote()
+Implement deleted in remote (a disabled test exists in StructureTest)
