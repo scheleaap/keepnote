@@ -449,13 +449,27 @@ class ContentFolderTrashNodeTest():
 		"""Returns the NotebookNodeDao class for the class under test."""
 		raise NotImplementedError()
 	
-	def test_no_changes_in_local(self):
+	def test_no_changes_in_local_1(self):
 		root = TestNotebookNode()
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
+	
+	def test_no_changes_in_local_2(self):
+		sn = self._create_storage_node(parent=ROOT_SN)
+		notebook_storage = storage.mem.InMemoryStorage()
+		add_storage_node(notebook_storage, ROOT_SN)
+		add_storage_node(notebook_storage, sn)
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		notebook_storage.read_only = True

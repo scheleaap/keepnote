@@ -147,8 +147,6 @@ class Dao(object):
 				elif in_local and in_remote:
 					local_payload = local_sn.get_payload(payload_name)
 					remote_payload = remote_sn.get_payload(payload_name)
-					print remote_payload.md5hash
-					print local_payload.md5hash
 					if remote_payload.md5hash != local_payload.md5hash:
 						# TODO: Replace with set_payload() or update_node()
 						self._notebook_storage.remove_node_payload(node_id, local_payload.name)
@@ -344,16 +342,17 @@ class ContentNodeDao(NotebookNodeDao):
 							node_id=sn.node_id,
 							main_payload_name=main_payload_name))
 		
-		main_payload = ReadFromStorageWriteToMemoryPayload(
+		main_payload_sn = [payload for payload in sn.payloads if payload.name == main_payload_name][0] # TODO Inefficient
+		main_payload_nn = ReadFromStorageWriteToMemoryPayload(
 				name=main_payload_name,
 				original_reader=partial(notebook_storage.get_node_payload, sn.node_id, main_payload_name),
-				original_md5hash='whazzup', # TODO
+				original_md5hash=main_payload_sn.md5hash,
 				)
-		additional_payloads = [
+		additional_payloads_nn = [
 				ReadFromStorageWriteToMemoryPayload(
 						name=payload.name,
 						original_reader=partial(notebook_storage.get_node_payload, sn.node_id, payload.name),
-						original_md5hash='whazzup', # TODO
+						original_md5hash=payload.md5hash,
 						)
 				for payload in sn.payloads if payload.name != main_payload_name
 				]
@@ -370,8 +369,8 @@ class ContentNodeDao(NotebookNodeDao):
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
 				client_preferences=client_preferences,
-				main_payload=main_payload,
-				additional_payloads=additional_payloads,
+				main_payload=main_payload_nn,
+				additional_payloads=additional_payloads_nn,
 				node_id=sn.node_id,
 				created_time=created_time,
 				modified_time=modified_time,
