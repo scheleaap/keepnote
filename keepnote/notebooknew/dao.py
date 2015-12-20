@@ -128,30 +128,34 @@ class Dao(object):
 		for node_id in others:
 			remote_sn = remote_sns_by_id[node_id]
 			local_sn = local_sns_by_id[node_id]
-			if remote_sn != local_sn:
-				# We're assuming only local changes can happen.
-				
-				presence = [
-						(payload_name, local_sn.has_payload(payload_name), remote_sn.has_payload(payload_name))
-						for payload_name
-						in set([p.name for p in local_sn.payloads]) | set([p.name for p in remote_sn.payloads])
-						]
-				
+			
+			# We're assuming only local changes can happen.
+
+			if local_sn.attributes != remote_sn.attributes:
 				self._notebook_storage.set_node_attributes(node_id, local_sn.attributes)
-				for payload_name, in_local, in_remote in presence:
-					if in_local and not in_remote:
-						with local_sn.get_payload(payload_name).get_data() as f:
-							self._notebook_storage.add_node_payload(node_id, payload_name, f)
-					elif in_local and in_remote:
-						local_payload = local_sn.get_payload(payload_name)
-						remote_payload = remote_sn.get_payload(payload_name)
-						if remote_payload.md5hash != local_payload.md5hash:
-							# TODO: Replace with set_payload() or update_node()
-							self._notebook_storage.remove_node_payload(node_id, local_payload.name)
-							with local_payload.get_data() as f:
-								self._notebook_storage.add_node_payload(node_id, local_payload.name, f)
-					elif not in_local and in_remote:
-						self._notebook_storage.remove_node_payload(node_id, payload_name)
+			
+			presence = [
+					(payload_name, local_sn.has_payload(payload_name), remote_sn.has_payload(payload_name))
+					for payload_name
+					in set([p.name for p in local_sn.payloads]) | set([p.name for p in remote_sn.payloads])
+					]
+			
+			for payload_name, in_local, in_remote in presence:
+				if in_local and not in_remote:
+					with local_sn.get_payload(payload_name).get_data() as f:
+						self._notebook_storage.add_node_payload(node_id, payload_name, f)
+				elif in_local and in_remote:
+					local_payload = local_sn.get_payload(payload_name)
+					remote_payload = remote_sn.get_payload(payload_name)
+					print remote_payload.md5hash
+					print local_payload.md5hash
+					if remote_payload.md5hash != local_payload.md5hash:
+						# TODO: Replace with set_payload() or update_node()
+						self._notebook_storage.remove_node_payload(node_id, local_payload.name)
+						with local_payload.get_data() as f:
+							self._notebook_storage.add_node_payload(node_id, local_payload.name, f)
+				elif not in_local and in_remote:
+					self._notebook_storage.remove_node_payload(node_id, payload_name)
 		
 		self._last_local_node_versions = local_sns_by_id.keys()
 		
@@ -445,13 +449,16 @@ class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 		self.original_reader = original_reader
 		self.original_md5hash = original_md5hash
 		self.new_data = None
-		self.md5hash = self.original_md5hash
+		self._md5hash = self.original_md5hash
+	
+	def get_md5hash(self):
+		return self._md5hash
 	
 	def open(self, mode='r'):
 		if mode == 'w':
 			def on_close(new_data):
 				self.new_data = new_data
-				self.md5hash = hashlib.md5(self.new_data).hexdigest()
+				self._md5hash = hashlib.md5(self.new_data).hexdigest()
 			return ReadFromStorageWriteToMemoryPayload.CapturingBytesIO(on_close)
 		else:
 			if self.new_data is not None:
@@ -462,7 +469,7 @@ class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 	def reset(self):
 		"""Removes the new data."""
 		self.new_data = None
-		self.md5hash = self.original_md5hash
+		self._md5hash = self.original_md5hash
 
 
 class TrashNodeDao(NotebookNodeDao):

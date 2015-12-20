@@ -10,8 +10,10 @@ from keepnote.notebooknew import CONTENT_TYPE_HTML
 from keepnote.notebooknew import NotebookNode, NotebookNodePayload, IllegalOperationError
 from keepnote.notebooknew import new_node_id
 from keepnote.notebooknew.dao import ReadFromStorageWriteToMemoryPayload
+from keepnote.notebooknew.storage import NotebookStorage
 
 __all__ = [
+		'CONTENT_TYPE_TEST',
 		'DEFAULT',
 		'DEFAULT_ID',
 		'DEFAULT_CONTENT_TYPE',
@@ -38,8 +40,10 @@ __all__ = [
 		'DEFAULT_JPG_PAYLOAD_HASH',
 		'TestNotebookNode',
 		'TestPayload',
+		'ReadOnlyInMemoryStorage',
 		]
 
+CONTENT_TYPE_TEST = u'application/x-notebook-test-node'
 
 DEFAULT=object()
 DEFAULT_ID = 'my_id'
@@ -76,7 +80,7 @@ class TestNotebookNode(NotebookNode):
 		super(TestNotebookNode, self).__init__(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
-				content_type=u'application/x-notebook-test',
+				content_type=CONTENT_TYPE_TEST,
 				parent=parent,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
@@ -124,19 +128,19 @@ class TestPayload(NotebookNodePayload):
 	def __init__(self, name, data):
 		super(TestPayload, self).__init__(name=name)
 		self.data = data
-		self.md5hash = hashlib.md5(self.data).hexdigest()
+		self._md5hash = hashlib.md5(self.data).hexdigest()
 	
 	def copy(self):
 		return TestPayload(self.name, self.data)
 	
 	def get_md5hash(self):
-		return self.md5hash
+		return self._md5hash
 	
 	def open(self, mode='r'):
 		if mode == 'w':
 			def on_close(data):
 				self.data = data
-				self.md5hash = hashlib.md5(self.data).hexdigest()
+				self._md5hash = hashlib.md5(self.data).hexdigest()
 			return ReadFromStorageWriteToMemoryPayload.CapturingBytesIO(on_close)
 		else:
 			return io.BytesIO(self.data)
@@ -149,3 +153,56 @@ class TestPayload(NotebookNodePayload):
 
 	def __ne__(self, other):
 		return not self.__eq__(other);
+
+class ReadOnlyInMemoryStorage(NotebookStorage):
+	def __init__(self, backing_storage, read_only=True):
+		self.backing_storage = backing_storage
+		self.read_only = read_only
+	
+	def add_node(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.add_node(*args, **kwargs)
+
+	def add_node_payload(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.add_node_payload(*args, **kwargs)
+	
+	def get_all_nodes(self, *args, **kwargs):
+		return self.backing_storage.get_all_nodes(*args, **kwargs)
+	
+	def get_node(self, *args, **kwargs):
+		return self.backing_storage.get_node(*args, **kwargs)
+
+	def get_node_payload(self, *args, **kwargs):
+		return self.backing_storage.get_node_payload(*args, **kwargs)
+	
+	def get_notebook(self, *args, **kwargs):
+		return self.backing_storage.get_notebook(*args, **kwargs)
+	
+	def has_node(self, *args, **kwargs):
+		return self.backing_storage.has_node(*args, **kwargs)
+	
+	def has_node_payload(self, *args, **kwargs):
+		return self.backing_storage.has_node_payload(*args, **kwargs)
+		
+	def remove_node(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.remove_node(*args, **kwargs)
+		
+	def remove_node_payload(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.remove_node_payload(*args, **kwargs)
+	
+	def set_node_attributes(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.set_node_attributes(*args, **kwargs)
+		
+	def set_notebook_attributes(self, *args, **kwargs):
+		if self.read_only: raise ReadOnlyError()
+		return self.backing_storage.set_notebook_attributes(*args, **kwargs)
+
+	def __repr__(self):
+		return '{cls}[]'.format(cls=self.__class__.__name__, **self.__dict__)
+
+class ReadOnlyError(Exception):
+	pass

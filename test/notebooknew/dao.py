@@ -15,8 +15,6 @@ from keepnote.notebooknew.storage import StoredNode, StoredNodePayload
 
 from test.notebooknew.testutils import *
 
-CONTENT_TYPE_TEST = u'application/x-notebook-test-node'
-
 PARENT_ID_ATTRIBUTE = 'parent_id'
 MAIN_PAYLOAD_NAME_ATTRIBUTE = 'main_payload_name'
 TITLE_ATTRIBUTE = 'title'
@@ -450,6 +448,20 @@ class ContentFolderTrashNodeTest():
 	def _get_class_dao(self):
 		"""Returns the NotebookNodeDao class for the class under test."""
 		raise NotImplementedError()
+	
+	def test_no_changes_in_local(self):
+		root = TestNotebookNode()
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		dao.sync()
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_content_type_new_in_local(self):
 		root = TestNotebookNode()
@@ -1253,7 +1265,7 @@ class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
 				)
 		
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, payload.open(mode='r').read())
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.md5hash)
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.get_md5hash())
 	
 	def test_write(self):
 		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
@@ -1267,7 +1279,7 @@ class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
 			f.write(DEFAULT_PNG_PAYLOAD_DATA)
 		
 		self.assertEqual(DEFAULT_PNG_PAYLOAD_DATA, payload.open(mode='r').read())
-		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.md5hash)
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.get_md5hash())
 	
 	def test_reset(self):
 		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
@@ -1282,7 +1294,7 @@ class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
 		payload.reset()
 		
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, payload.open(mode='r').read())
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.md5hash)
+		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.get_md5hash())
 
 
 class FolderNodeTest:#(unittest.TestCase): # TODO
