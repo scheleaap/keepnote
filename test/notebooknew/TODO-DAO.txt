@@ -15,7 +15,11 @@ x	title_fgcolor
 x	title_bgcolor
 x	client_preferences
 x	payload
+	test_deleted_in_local (enable test)
+	parent set in NN
+	dirty == false after sync
 Implement changed in remote sync
 	all attributes
 	payload
 Implement deleted in remote (a disabled test exists in StructureTest)
+Additional attributes in storage kept, not overwritten

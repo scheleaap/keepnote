@@ -378,34 +378,61 @@ class ContentNodeDao(NotebookNodeDao):
 		
 		return nn
 
-
-class FolderNodeDao(NotebookNodeDao):
+class AbstractFolderTrashNodeDao(NotebookNodeDao):
 	"""TODO"""
 	
+	def __init__(self, cls, content_type):
+		self.cls = cls
+		self.content_type = content_type
+	
 	def accepts(self, content_type):
-		return content_type == CONTENT_TYPE_FOLDER
+		return content_type == self.content_type
+	
+	def nn_to_sn(self, nn):
+		attributes = {
+				TITLE_ATTRIBUTE.key: nn.title,
+				CLIENT_PREFERENCES_ATTRIBUTE.key: nn.client_preferences._data,
+				}
+		if nn.parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE.key] = nn.parent.node_id
+		if nn.icon_normal is not None:
+			attributes[ICON_NORMAL_ATTRIBUTE.key] = nn.icon_normal
+		if nn.icon_open is not None:
+			attributes[ICON_OPEN_ATTRIBUTE.key] = nn.icon_open
+		if nn.title_color_foreground is not None:
+			attributes[TITLE_COLOR_FOREGROUND_ATTRIBUTE.key] = nn.title_color_foreground
+		if nn.title_color_background is not None:
+			attributes[TITLE_COLOR_BACKGROUND_ATTRIBUTE.key] = nn.title_color_background
+		if nn.created_time is not None:
+			attributes[CREATED_TIME_ATTRIBUTE.key] = datetime_to_timestamp(nn.created_time)
+		if nn.modified_time is not None:
+			attributes[MODIFIED_TIME_ATTRIBUTE.key] = datetime_to_timestamp(nn.modified_time)
+		
+		return StoredNode(nn.node_id, nn.content_type, attributes, payloads=[])
 	
 	def sn_to_nn(self, sn, notebook_storage, notebook):
 		title = get_attribute_value(TITLE_ATTRIBUTE, sn.attributes)
 		created_time = get_attribute_value(CREATED_TIME_ATTRIBUTE, sn.attributes)
 		modified_time = get_attribute_value(MODIFIED_TIME_ATTRIBUTE, sn.attributes)
-		order = get_attribute_value(ORDER_ATTRIBUTE, sn.attributes)
+# 		order = get_attribute_value(ORDER_ATTRIBUTE, sn.attributes)
 		icon_normal = get_attribute_value(ICON_NORMAL_ATTRIBUTE, sn.attributes)
 		icon_open = get_attribute_value(ICON_OPEN_ATTRIBUTE, sn.attributes)
 		title_color_foreground = get_attribute_value(TITLE_COLOR_FOREGROUND_ATTRIBUTE, sn.attributes)
 		title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, sn.attributes)
+		client_preferences = get_attribute_value(CLIENT_PREFERENCES_ATTRIBUTE, sn.attributes)
 		
-		nn = FolderNode(
+		nn = self.cls(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=None,
 				loaded_from_storage=True,
 				title=title,
-				order=order,
+# 				order=order,
 				icon_normal=icon_normal,
 				icon_open=icon_open,
 				title_color_foreground=title_color_foreground,
 				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=sn.node_id,
 				created_time=created_time,
 				modified_time=modified_time,
@@ -413,7 +440,12 @@ class FolderNodeDao(NotebookNodeDao):
 		
 		return nn
 
-
+class FolderNodeDao(AbstractFolderTrashNodeDao):
+	"""TODO"""
+	
+	def __init__(self):
+		super(FolderNodeDao, self).__init__(FolderNode, CONTENT_TYPE_FOLDER)
+	
 class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 	"""A NotebookNodePayload that returns the original payload data or the changed data if the payload has been written.
 
@@ -471,40 +503,12 @@ class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 		self._md5hash = self.original_md5hash
 
 
-class TrashNodeDao(NotebookNodeDao):
+class TrashNodeDao(AbstractFolderTrashNodeDao):
 	"""TODO"""
 	
-	def accepts(self, content_type):
-		return content_type == CONTENT_TYPE_TRASH
-	
-	def sn_to_nn(self, sn, notebook_storage, notebook):
-		title = get_attribute_value(TITLE_ATTRIBUTE, sn.attributes)
-		created_time = get_attribute_value(CREATED_TIME_ATTRIBUTE, sn.attributes)
-		modified_time = get_attribute_value(MODIFIED_TIME_ATTRIBUTE, sn.attributes)
-		order = get_attribute_value(ORDER_ATTRIBUTE, sn.attributes)
-		icon_normal = get_attribute_value(ICON_NORMAL_ATTRIBUTE, sn.attributes)
-		icon_open = get_attribute_value(ICON_OPEN_ATTRIBUTE, sn.attributes)
-		title_color_foreground = get_attribute_value(TITLE_COLOR_FOREGROUND_ATTRIBUTE, sn.attributes)
-		title_color_background = get_attribute_value(TITLE_COLOR_BACKGROUND_ATTRIBUTE, sn.attributes)
-		
-		nn = TrashNode(
-				notebook_storage=notebook_storage,
-				notebook=notebook,
-				parent=None,
-				loaded_from_storage=True,
-				title=title,
-				order=order,
-				icon_normal=icon_normal,
-				icon_open=icon_open,
-				title_color_foreground=title_color_foreground,
-				title_color_background=title_color_background,
-				node_id=sn.node_id,
-				created_time=created_time,
-				modified_time=modified_time,
-				)
-		
-		return nn
-		
+	def __init__(self):
+		super(TrashNodeDao, self).__init__(TrashNode, CONTENT_TYPE_TRASH)
+
 
 class DaoError(Exception):
 	pass

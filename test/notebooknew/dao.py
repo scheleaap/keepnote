@@ -56,7 +56,7 @@ def datetime_to_timestamp(dt):
 	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
-class StructureTest:#(unittest.TestCase):
+class StructureTest(unittest.TestCase):
 	def test_new_in_remote_only_root(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -370,6 +370,7 @@ class StructureTest:#(unittest.TestCase):
 		
 		self.assertEqual(4, len(list(notebook_storage.get_all_nodes())))
 	
+	@unittest.skip('TODO')
 	def test_deleted_in_local(self):
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
@@ -406,7 +407,7 @@ class StructureTest:#(unittest.TestCase):
 		self.assertEqual(False, notebook_storage.has_node(CHILD2_SN.node_id))
 		self.assertEqual(False, notebook.has_node(CHILD2_SN.node_id))
 
-class ContentFolderTrashNodeTest():
+class ContentFolderTrashNodeTest(object):
 	def _create_storage_node(
 			self,
 			content_type=DEFAULT_CONTENT_TYPE,
@@ -479,7 +480,7 @@ class ContentFolderTrashNodeTest():
 	
 	def test_content_type_new_in_local(self):
 		root = TestNotebookNode()
-		node = self._create_notebook_node(content_type=DEFAULT_CONTENT_TYPE, parent=root, add_to_parent=True)
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
 		notebook.root = node
@@ -490,7 +491,7 @@ class ContentFolderTrashNodeTest():
 		self.assertEqual(node.content_type, notebook_storage.get_node(node.node_id).content_type)
 	
 	def test_content_type_new_in_remote(self):
-		sn = self._create_storage_node(content_type=DEFAULT_CONTENT_TYPE, parent=ROOT_SN)
+		sn = self._create_storage_node(parent=ROOT_SN)
 		notebook_storage = storage.mem.InMemoryStorage()
 		add_storage_node(notebook_storage, ROOT_SN)
 		add_storage_node(notebook_storage, sn)
@@ -509,21 +510,6 @@ class ContentFolderTrashNodeTest():
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
-		dao.sync()
-		
-		self.assertEqual(node.parent.node_id, notebook_storage.get_node(node.node_id).attributes[PARENT_ID_ATTRIBUTE])
-	
-	def test_parent_changed_in_local(self):
-		root = TestNotebookNode()
-		other_node = TestNotebookNode(parent=root, add_to_parent=True)
-		node = self._create_notebook_node(parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
-		dao.sync()
-		
-		node.move(other_node)
 		dao.sync()
 		
 		self.assertEqual(node.parent.node_id, notebook_storage.get_node(node.node_id).attributes[PARENT_ID_ATTRIBUTE])
@@ -885,8 +871,24 @@ class ContentFolderTrashNodeTest():
 		self.fail()
 	
 
+class ContentFolderNodeTest(ContentFolderTrashNodeTest):
+	def test_parent_changed_in_local(self):
+		root = TestNotebookNode()
+		other_node = TestNotebookNode(parent=root, add_to_parent=True)
+		node = self._create_notebook_node(parent=root, add_to_parent=True)
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		notebook.root = node
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
+		dao.sync()
+		
+		node.move(other_node)
+		dao.sync()
+		
+		self.assertEqual(node.parent.node_id, notebook_storage.get_node(node.node_id).attributes[PARENT_ID_ATTRIBUTE])
+	
 
-class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
+class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 	def _create_storage_node(
 			self,
 			content_type=DEFAULT_CONTENT_TYPE,
@@ -1257,15 +1259,15 @@ class ContentNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 		self.assertEqual(sn.get_payload(DEFAULT_JPG_PAYLOAD_NAME).get_data().read(), notebook.get_node_by_id(sn.node_id).payloads[DEFAULT_JPG_PAYLOAD_NAME].open(mode='r').read())
 	
 	@unittest.skip('TODO')
-	def test_additional_payloads_added_in_remote(self):
+	def test_additional_payload_added_in_remote(self):
 		self.fail()
 	
 	@unittest.skip('TODO')
-	def test_additional_payloads_changed_in_remote(self):
+	def test_additional_payload_changed_in_remote(self):
 		self.fail()
 	
 	@unittest.skip('TODO')
-	def test_additional_payloads_removed_in_remote(self):
+	def test_additional_payload_removed_in_remote(self):
 		self.fail()
 
 
@@ -1311,7 +1313,101 @@ class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
 		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.get_md5hash())
 
 
-class FolderNodeTest:#(unittest.TestCase): # TODO
+class FolderNodeTest(ContentFolderNodeTest, unittest.TestCase):
+	def _create_storage_node(
+			self,
+			parent=None,
+			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			created_timestamp=DEFAULT_CREATED_TIMESTAMP,
+			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
+			client_preferences=DEFAULT_CLIENT_PREFERENCES,
+			):
+		
+		attributes = {
+			TITLE_ATTRIBUTE: title,
+# 			ORDER_ATTRIBUTE: order,
+			ICON_NORMAL_ATTRIBUTE: icon_normal,
+			ICON_OPEN_ATTRIBUTE: icon_open,
+			TITLE_COLOR_FOREGROUND_ATTRIBUTE: title_color_foreground,
+			TITLE_COLOR_BACKGROUND_ATTRIBUTE: title_color_background,
+			CREATED_TIME_ATTRIBUTE: created_timestamp,
+			MODIFIED_TIME_ATTRIBUTE: modified_timestamp,
+			CLIENT_PREFERENCES_ATTRIBUTE: client_preferences,
+		}
+		if parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = parent.node_id
+		
+		node = StoredNode(
+			node_id=new_node_id(),
+			content_type=CONTENT_TYPE_FOLDER,
+			attributes=attributes,
+			payloads=[],
+			)
+		
+		return node
+	
+	def _create_notebook_node(
+			self,
+			notebook=None,
+			parent=None,
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
+			add_to_parent=None,
+			):
+		
+		if loaded_from_storage:
+			if node_id is DEFAULT:
+				node_id = new_node_id()
+			if created_time is DEFAULT:
+				created_time = DEFAULT_CREATED_TIME
+			if modified_time is DEFAULT:
+				modified_time = DEFAULT_MODIFIED_TIME
+		else:
+			if node_id is DEFAULT:
+				node_id = None
+			if created_time is DEFAULT:
+				created_time = None
+			if modified_time is DEFAULT:
+				modified_time = None
+		
+		node = FolderNode(
+				notebook_storage=None,
+				notebook=notebook,
+				parent=parent,
+				loaded_from_storage=loaded_from_storage,
+				title=title,
+# 				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
+				)
+		if parent is not None:
+			if add_to_parent is None:
+				raise IllegalOperationError('Please pass add_to_parent')
+			elif add_to_parent == True:
+				parent._add_child_node(node)
+		return node
+	
+	def _get_class_dao(self):
+		return FolderNodeDao()
+	
 	def test_load_folder_node(self):
 		"""Test loading a folder node."""
 		
@@ -1346,7 +1442,7 @@ class FolderNodeTest:#(unittest.TestCase): # TODO
 		self.assertEqual(DEFAULT_TITLE, node.title)
 		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
 		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
+#		self.assertEqual(DEFAULT_ORDER, node.order)
 		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
 		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
 		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
@@ -1376,7 +1472,101 @@ class FolderNodeTest:#(unittest.TestCase): # TODO
 		self.assertIsNotNone(node.title)	
 	
 
-class TrashNodeTest:#(unittest.TestCase): # TODO
+class TrashNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
+	def _create_storage_node(
+			self,
+			parent=None,
+			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			created_timestamp=DEFAULT_CREATED_TIMESTAMP,
+			modified_timestamp=DEFAULT_MODIFIED_TIMESTAMP,
+			client_preferences=DEFAULT_CLIENT_PREFERENCES,
+			):
+		
+		attributes = {
+			TITLE_ATTRIBUTE: title,
+# 			ORDER_ATTRIBUTE: order,
+			ICON_NORMAL_ATTRIBUTE: icon_normal,
+			ICON_OPEN_ATTRIBUTE: icon_open,
+			TITLE_COLOR_FOREGROUND_ATTRIBUTE: title_color_foreground,
+			TITLE_COLOR_BACKGROUND_ATTRIBUTE: title_color_background,
+			CREATED_TIME_ATTRIBUTE: created_timestamp,
+			MODIFIED_TIME_ATTRIBUTE: modified_timestamp,
+			CLIENT_PREFERENCES_ATTRIBUTE: client_preferences,
+		}
+		if parent is not None:
+			attributes[PARENT_ID_ATTRIBUTE] = parent.node_id
+		
+		node = StoredNode(
+			node_id=new_node_id(),
+			content_type=CONTENT_TYPE_TRASH,
+			attributes=attributes,
+			payloads=[],
+			)
+		
+		return node
+	
+	def _create_notebook_node(
+			self,
+			notebook=None,
+			parent=None,
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+# 			order=DEFAULT_ORDER,
+			icon_normal=DEFAULT_ICON_NORMAL,
+			icon_open=DEFAULT_ICON_OPEN,
+			title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND,
+			title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND,
+			node_id=DEFAULT,
+			created_time=DEFAULT,
+			modified_time=DEFAULT,
+			add_to_parent=None,
+			):
+		
+		if loaded_from_storage:
+			if node_id is DEFAULT:
+				node_id = new_node_id()
+			if created_time is DEFAULT:
+				created_time = DEFAULT_CREATED_TIME
+			if modified_time is DEFAULT:
+				modified_time = DEFAULT_MODIFIED_TIME
+		else:
+			if node_id is DEFAULT:
+				node_id = None
+			if created_time is DEFAULT:
+				created_time = None
+			if modified_time is DEFAULT:
+				modified_time = None
+		
+		node = TrashNode(
+				notebook_storage=None,
+				notebook=notebook,
+				parent=parent,
+				loaded_from_storage=loaded_from_storage,
+				title=title,
+# 				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
+				)
+		if parent is not None:
+			if add_to_parent is None:
+				raise IllegalOperationError('Please pass add_to_parent')
+			elif add_to_parent == True:
+				parent._add_child_node(node)
+		return node
+	
+	def _get_class_dao(self):
+		return TrashNodeDao()
+	
 	def test_load_trash_node(self):
 		"""Test loading a trash node."""
 		
@@ -1412,7 +1602,7 @@ class TrashNodeTest:#(unittest.TestCase): # TODO
 		self.assertEqual(DEFAULT_TITLE, node.title)
 		self.assertEqual(DEFAULT_CREATED_TIME, node.created_time)
 		self.assertEqual(DEFAULT_MODIFIED_TIME, node.modified_time)
-		self.assertEqual(DEFAULT_ORDER, node.order)
+#		self.assertEqual(DEFAULT_ORDER, node.order)
 		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
 		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
 		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
@@ -1456,11 +1646,16 @@ class TestNotebookNodeDao(NotebookNodeDao):
 		return StoredNode(nn.node_id, nn.content_type, attributes, [])
 	
 	def sn_to_nn(self, sn, notebook_storage, notebook):
+		if TITLE_ATTRIBUTE in sn.attributes:
+			title = sn.attributes[TITLE_ATTRIBUTE]
+		else:
+			title = ''
+		
 		return TestNotebookNode(
 				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=None,
 				loaded_from_storage=True,
-				title=sn.attributes[TITLE_ATTRIBUTE],
+				title=title,
 				node_id=sn.node_id,
 				)
