@@ -166,7 +166,7 @@ class NotebookNode(object):
 	
 	@ivar notebook: TODO
 	@ivar node_id: The id of the node.
-	@ivar children: The node's children that have not been deleted and are waiting to be saved. TODO
+	@ivar children: The node's children.
 	@ivar content_type: The content type of the node.
 	@ivar parent: The parent of the node.
 	@ivar title: The title of the node.

@@ -13,7 +13,7 @@
 - basetreeview._add_model_column(): get = lambda ...
 - integration test: opening a notebook with 1000 assets takes <= 0.5 seconds
 - integration test: saving a notebook with 1000 assets takes <= 0.5 seconds
-- _add_unbound_node_as_child() invoeren -- parent als constructorparameter verwijderen en _add_child_node() vervangen
+- _add_unbound_node_as_child() invoeren -- notebook en parent als constructorparameter verwijderen en _add_child_node() vervangen
 
 x create_copy()
 - receive_moving_node(node, after)

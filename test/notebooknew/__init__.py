@@ -66,67 +66,6 @@ def datetime_to_timestamp(dt):
 	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
-class NotebookTest(unittest.TestCase):
-	@unittest.skip('TODO: MIGRATE')
-	def test_load_notebook(self):
-		"""Test loading a notebook."""
-		
-		# Initialize a NotebookStorage.
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(TRASH_SN.node_id, TRASH_SN.content_type, TRASH_SN.attributes, [])
-		
-		# Initialize Notebook.
-		notebook = Notebook()
-		
-		# Verify the Notebook.
-# 		self.assertEqual(False, notebook.is_dirty)
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_root_created_in_empty_storage(self):
-		"""Test if a root is created if the NotebookStorage is empty."""
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = []
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.root
-		self.assertIsNotNone(node)
-		self.assertEqual(CONTENT_TYPE_FOLDER, node.content_type)
-		
-		# Verify the notebook.
-		self.assertEqual(True, notebook.is_dirty) 
-		
-		# Verify the storage.
-		self.assertEqual(False, notebook_storage.add_node.called)
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_trash_created_if_missing(self):
-		"""Test if a trash is created in a NotebookStorage without one."""
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN]
-		
-		# Initialize Notebook with the mocked NotebookStorage.
-		notebook = Notebook(notebook_storage)
-		
-		# Verify the node.
-		node = notebook.trash
-		self.assertEqual(CONTENT_TYPE_TRASH, node.content_type)
-		self.assertEqual(notebook.root, node.parent)
-		# TODO: Title?
-		
-		# Verify the notebook.
-		self.assertEqual(True, notebook.is_dirty) 
-		
-		# Verify the storage.
-		self.assertEqual(False, notebook_storage.add_node.called)
-	
 	def test_client_preferences(self):
 		"""Test the setting and getting of Notebook client preferences."""
 		
@@ -144,18 +83,6 @@ class NotebookTest(unittest.TestCase):
 		expected.set('test', 'key', 'value')
 		self.assertEqual(expected, notebook.client_preferences)
 	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_without_changes(self):
-		notebook_storage = storage.mem.InMemoryStorage()
-		notebook_storage.add_node(ROOT_SN.node_id, ROOT_SN.content_type, ROOT_SN.attributes, [])
-		notebook_storage.add_node(TRASH_SN.node_id, TRASH_SN.content_type, TRASH_SN.attributes, [])
-		notebook = Notebook(notebook_storage)
-		
-# 		self.assertEqual(False, notebook.is_dirty)
-		notebook.save()
-		
-		self.assertEqual(2, len(list(notebook_storage.get_all_nodes())))
-	
 	def test_close_without_changes(self):
 		handler = Mock()
 		
@@ -166,29 +93,6 @@ class NotebookTest(unittest.TestCase):
 		notebook.close()
 		
 		handler.assert_has_calls([call.on_closing(), call.on_close()])
-	
-	# TODO: Consider making the desktop client responsible for saving before closing.
-	@unittest.skip('TODO: MIGRATE')
-	def test_close_with_changes(self):
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		notebook_storage.get_all_nodes.return_value = [ROOT_SN, TRASH_SN]
-		handler = Mock()
-		root_mock = Mock()
-		root_mock.handler = handler
-		root_mock.notebook_storage = notebook_storage
-		
-		notebook = Notebook(notebook_storage)
-		notebook.root.new_folder_child_node(DEFAULT_TITLE)
-		notebook.closing_listeners.add(handler.on_closing)
-		notebook.close_listeners.add(handler.on_close)
-		
-		notebook.close()
-		
-		root_mock.assert_has_calls([
-				call.handler.on_closing(),
-				call.notebook_storage.add_node(node_id=mock.ANY, content_type=mock.ANY, attributes=mock.ANY, payloads=mock.ANY),
-				call.handler.on_close()
-				])
 	
 	@unittest.skip('TODO')
 	def test_node_changed_event(self):
@@ -683,28 +587,6 @@ class ContentFolderTrashNodeTestBase(object):
 		assert_that(copy.client_preferences, equal_to(node.client_preferences))
 		assert_that(copy.client_preferences, is_not(same_instance(node.client_preferences)))
 	
-	@unittest.skip("TODO: MIGRATE?")
-	def test_save_new_with_dirty_parent(self):
-		"""Tests saving a new node with a dirty parent."""
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and the parent.
-		parent = TestNotebookNode()
-		parent.set_is_dirty(True)
-		node = self._create_node(parent=parent, loaded_from_storage=False)
-		
-		with self.assertRaises(IllegalOperationError):
-			# Save the node.
-			node.save()
-		
-		# Verify the storage.
-		self.assertEqual(False, notebook_storage.add_node.called)
-		
-		# Verify the node.
-# 		self.assertEqual(True, node.is_dirty)
-	
 	def test_create_copy(self):
 		node = self._create_node(notebook=Notebook(), loaded_from_storage=False)
 		
@@ -1071,50 +953,6 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual([node], old_parent.children)
 		self.assertEqual([], new_parent.children)
 	
-	@unittest.skip("TODO: MIGRATE?")
-	def test_save_loaded_and_deleted_with_dirty_parent(self):
-		"""Tests saving a loaded and deleted node with a dirty parent."""
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and the parent.
-		parent = TestNotebookNode()
-		parent.set_is_dirty(True)
-		node = self._create_node(parent=parent, loaded_from_storage=True)
-		
-		# Delete the node.
-		node.delete()
-		
-		with self.assertRaises(IllegalOperationError):
-			# Save the node.
-			node.save()
-		
-		# Verify the storage.
-		self.assertEqual(False, notebook_storage.add_node.called)
-		
-		# Verify the node.
-# 		self.assertEqual(True, node.is_dirty)
-	
-	@unittest.skip("TODO: MIGRATE?")
-	def test_save_loaded_and_deleted_with_deleted_parent(self):
-		"""Tests saving a loaded and deleted node with a deleted parent."""
-		
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and the parent.
-		parent = TestNotebookNode()
-		parent.set_is_deleted(True)
-		parent.set_is_dirty(True)
-		node = self._create_node(parent=parent, loaded_from_storage=True)
-		
-		# Delete the node.
-		node.delete()
-		
-		# Save the node.
-		node.save()
-	
 
 class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
@@ -1247,46 +1085,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		self.assertEqual([DEFAULT_JPG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_NAME], node.additional_payload_names)
 		self.assertEqual(DEFAULT_PNG_PAYLOAD_DATA, node.payloads[DEFAULT_PNG_PAYLOAD_NAME].open('r').read())		
 	
-	@unittest.skip('TODO MIGRATE')
-	def test_get_payload_from_storage(self):
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		node = ContentNode(
-				notebook=None,
-				node_id=DEFAULT_ID,
-				content_type=DEFAULT_CONTENT_TYPE,
-				parent=None,
-				loaded_from_storage=True,
-				title=DEFAULT_TITLE,
-				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
-				additional_payload_names=[],
-				)
-
-		def side_effect_get_node_payload(node_id, payload_name):
-			if node_id == node.node_id and payload_name == DEFAULT_HTML_PAYLOAD_NAME:
-				return io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
-			else:
-				raise storage.PayloadDoesNotExistError
-		notebook_storage.get_node_payload.side_effect = side_effect_get_node_payload
-		
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, node.get_payload(DEFAULT_HTML_PAYLOAD_NAME))
-		
-	@unittest.skip('TODO MIGRATE')
-	def test_get_payload_nonexistent(self):
-		node = ContentNode(
-				notebook=None,
-				node_id=DEFAULT_ID,
-				content_type=DEFAULT_CONTENT_TYPE,
-				parent=None,
-				loaded_from_storage=True,
-				title=DEFAULT_TITLE,
-				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
-				additional_payload_names=[],
-				)
-		
-		with self.assertRaises(PayloadDoesNotExistError):
-			node.get_payload('unknown_name')
-	
 	def test_remove_additional_payload(self):
 		node = ContentNode(
 				notebook=None,
@@ -1325,142 +1123,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 			node.remove_additional_payload(DEFAULT_PNG_PAYLOAD_NAME)
 		
 # 		self.assertEqual(False, node.is_dirty)
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_new(self):
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and the parent.
-		parent = Mock(spec=NotebookNode)
-		parent.node_id = new_node_id()
-		parent.is_dirty = False
-		node = ContentNode(
-				notebook=None,
-				content_type=DEFAULT_CONTENT_TYPE,
-				parent=parent,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
-				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA)],
-				)
-		
-		# Save the node.
-		node.save()
-		
-		# Verify the storage.
-		notebook_storage.add_node.assert_called_once_with(
-				node_id=node.node_id,
-				content_type=DEFAULT_CONTENT_TYPE,
-				attributes=node._notebook_storage_attributes,
-				payloads=[
-						(DEFAULT_HTML_PAYLOAD_NAME, FileMatcher(io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA))),
-						(DEFAULT_PNG_PAYLOAD_NAME, FileMatcher(io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA)))
-						]
-				)
-		
-		# Verify the node.
-# 		self.assertEqual(False, node.is_dirty)
-		
-		# Verify that saving the node again does nothing.
-		notebook_storage.reset_mock()
-		node._unsaved_changes.add(NotebookNode.DUMMY_CHANGE)
-		node.save()
-		self.assertEqual(False, notebook_storage.add_node.called)
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_new_root(self):
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and the parent.
-		node = ContentNode(
-				notebook=None,
-				content_type=DEFAULT_CONTENT_TYPE,
-				parent=None,
-				loaded_from_storage=False,
-				title=DEFAULT_TITLE,
-				main_payload=(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
-				additional_payloads=[(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA)],
-				)
-		
-		# Save the node.
-		node.save()
-		
-		# Verify the storage.
-		notebook_storage.add_node.assert_called_once_with(
-				node_id=node.node_id,
-				content_type=DEFAULT_CONTENT_TYPE,
-				attributes=node._notebook_storage_attributes,
-				payloads=[
-						(DEFAULT_HTML_PAYLOAD_NAME, FileMatcher(io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA))),
-						(DEFAULT_PNG_PAYLOAD_NAME, FileMatcher(io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA)))
-						]
-				)
-		
-		# Verify the node.
-# 		self.assertEqual(False, node.is_dirty)
-		
-		# Verify that saving the node again does nothing.
-		notebook_storage.reset_mock()
-		node._unsaved_changes.add(NotebookNode.DUMMY_CHANGE)
-		node.save()
-		self.assertEqual(False, notebook_storage.add_node.called)
-	
-	@unittest.skip('TODO: MIGRATE')
-	def test_save_multiple_changes(self):
-		"""Tests saving multiple changes at once."""
-		# Create a mocked NotebookStorage.
-		notebook_storage = Mock(spec=storage.NotebookStorage)
-		
-		# Create the node and parents.
-		old_parent = TestNotebookNode()
-		new_parent = TestNotebookNode()
-		node = ContentNode(
-				notebook=None,
-				node_id=DEFAULT_ID,
-				content_type=DEFAULT_CONTENT_TYPE,
-				parent=old_parent,
-				loaded_from_storage=True,
-				title=DEFAULT_TITLE,
-				main_payload_name=DEFAULT_HTML_PAYLOAD_NAME,
-				additional_payload_names=[DEFAULT_PNG_PAYLOAD_NAME],
-				)
-		old_parent._add_child_node(node)
-
-		# Make several changes.
-		node.title = 'new title'
-		node.move(new_parent)
-		node.set_main_payload('new html payload data')
-		node.remove_additional_payload(DEFAULT_PNG_PAYLOAD_NAME)
-		node.add_additional_payload(DEFAULT_PNG_PAYLOAD_NAME, 'new png payload')
-		node.add_additional_payload(DEFAULT_JPG_PAYLOAD_NAME, 'new jpg payload')
-		
-		# Save the node.
-		node.save()
-		
-		# Verify the storage.
-		self.assertEqual(False, notebook_storage.add_node.called)
-		self.assertEqual([
-				call.set_node_attributes(DEFAULT_ID, node._notebook_storage_attributes),
-				call.remove_node_payload(DEFAULT_ID, DEFAULT_HTML_PAYLOAD_NAME),
-				call.remove_node_payload(DEFAULT_ID, DEFAULT_PNG_PAYLOAD_NAME),
-				call.add_node_payload(DEFAULT_ID, DEFAULT_HTML_PAYLOAD_NAME, FileMatcher(io.BytesIO('new html payload data'))),
-				call.add_node_payload(DEFAULT_ID, DEFAULT_PNG_PAYLOAD_NAME, FileMatcher(io.BytesIO('new png payload'))),
-				call.add_node_payload(DEFAULT_ID, DEFAULT_JPG_PAYLOAD_NAME, FileMatcher(io.BytesIO('new jpg payload'))),
-				], notebook_storage.method_calls)
-		
-		# Verify the node.
-# 		self.assertEqual(False, node.is_dirty)
-		
-		# Verify that saving the node again does nothing.
-		notebook_storage.reset_mock()
-		node._unsaved_changes.add(NotebookNode.DUMMY_CHANGE)
-		node.save()
-		self.assertEqual(False, notebook_storage.add_node.called)
-		self.assertEqual(False, notebook_storage.set_node_attributes.called)
-		self.assertEqual(False, notebook_storage.add_node_payload.called)
-		self.assertEqual(False, notebook_storage.remove_node_payload.called)
 
 class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 	def _create_node(
