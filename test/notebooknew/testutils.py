@@ -6,7 +6,7 @@ import io
 import os
 from pytz import utc
 
-from keepnote.notebooknew import CONTENT_TYPE_HTML
+from keepnote.notebooknew import CONTENT_TYPE_HTML, FolderNode
 from keepnote.notebooknew import NotebookNode, NotebookNodePayload, IllegalOperationError
 from keepnote.notebooknew import new_node_id
 from keepnote.notebooknew.dao import ReadFromStorageWriteToMemoryPayload
@@ -71,24 +71,46 @@ DEFAULT_JPG_PAYLOAD_DATA = base64.b64decode('/9j/4AAQSkZJRgABAQEAYwBjAAD/4QBmRXh
 DEFAULT_JPG_PAYLOAD_HASH = hashlib.md5(DEFAULT_JPG_PAYLOAD_DATA).hexdigest()
 
 
-class TestNotebookNode(NotebookNode):
+class TestNotebookNode(FolderNode):
 	"""A testing implementation of NotebookNode."""
 
-	def __init__(self, notebook=None, parent=None, add_to_parent=None, loaded_from_storage=True, title=DEFAULT_TITLE, node_id=None):
-		if node_id is None:
-			node_id = new_node_id()
+	def __init__(self,
+			notebook=None,
+			parent=None,
+			add_to_parent=None,
+			loaded_from_storage=False,
+			title=DEFAULT_TITLE,
+			order=None,
+			icon_normal=None,
+			icon_open=None,
+			title_color_foreground=None,
+			title_color_background=None,
+			client_preferences=None,
+			node_id=None,
+			created_time=None,
+			modified_time=None,
+			):
+		
 		super(TestNotebookNode, self).__init__(
 				notebook=notebook,
-				content_type=CONTENT_TYPE_TEST,
 				parent=parent,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
+				order=order,
+				icon_normal=icon_normal,
+				icon_open=icon_open,
+				title_color_foreground=title_color_foreground,
+				title_color_background=title_color_background,
+				client_preferences=client_preferences,
 				node_id=node_id,
+				created_time=created_time,
+				modified_time=modified_time,
 				)
 		
-		self.is_dirty = False
+		self.content_type = CONTENT_TYPE_TEST
+		
 		self._create_copy_result_override = None
-		self._is_in_trash_override = False
+		self._is_in_trash_override = None
 		
 		if self.parent is not None:
 			if add_to_parent is None:
@@ -100,23 +122,31 @@ class TestNotebookNode(NotebookNode):
 		if self._create_copy_result_override is not None:
 			return self._create_copy_result_override
 		
-		raise NotImplementedError('TODO')
-	
-	def delete(self):
-		self.is_deleted = True
-	
+		copy = TestNotebookNode(
+				notebook=None,
+				parent=None,
+				title=self.title,
+				icon_normal=self.icon_normal,
+				icon_open=self.icon_open,
+				title_color_foreground=self.title_color_foreground,
+				title_color_background=self.title_color_background,
+				client_preferences=self.client_preferences._data,
+				loaded_from_storage=False,
+				)
+		if with_subtree:
+			for child in self._children:
+				if not child.is_deleted:
+					child_copy = child.create_copy(with_subtree=with_subtree)
+					copy.add_new_node_as_child(child_copy)
+		
+		return copy
+
 	@property
 	def is_in_trash(self):
-		return self._is_in_trash_override
-	
-	@property
-	def is_root(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
-	
-	@property
-	def is_trash(self):
-		return False
+		if self._is_in_trash_override is not None:
+			return self._is_in_trash_override
+		else:
+			return super(TestNotebookNode, self).is_in_trash
 	
 	def set_create_copy_result(self, value):
 		self._create_copy_result_override = value
