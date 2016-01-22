@@ -1,6 +1,7 @@
 """File system storage."""
 
 import io
+import hashlib
 import logging
 import os
 import shutil
@@ -30,7 +31,7 @@ class FileSystemStorage(NotebookStorage):
 		if self.has_node(node_id):
 			raise NodeAlreadyExistsError()
 		
-		stored_node = StoredNode(node_id, content_type, attributes, payload_names=[])
+		stored_node = StoredNode(node_id, content_type, attributes, payloads=[])
 		self._write_node(node_id, stored_node)
 		for payload in payloads:
 			self.add_node_payload(node_id, payload[0], payload[1])
@@ -46,10 +47,12 @@ class FileSystemStorage(NotebookStorage):
 			os.makedirs(directory_path)
 		
 		with io.open(self._get_node_payload_file_path(node_id, payload_name), mode='wb') as f:
-			f.write(payload_file.read())
+			data = payload_file.read()
+			f.write(data)
+			payload_hash = hashlib.md5(data).hexdigest()
 		
 		stored_node = self.get_node(node_id)
-		stored_node.payload_names.append(payload_name)
+		stored_node.payloads.append(StoredNodePayload(payload_name, payload_hash))
 		self._write_node(node_id, stored_node)
 	
 	def get_all_nodes(self):
@@ -126,12 +129,12 @@ class FileSystemStorage(NotebookStorage):
 			if key is None:
 				raise ParseError('Missing attribute \'key\' in element <attribute>')
 			attributes[attribute_el.get('key')] = attribute_el.text
-		payload_names = []
-		payload_name_els = root.findall('payload-names/payload-name')
-		for payload_name_el in payload_name_els:
-			payload_names.append(payload_name_el.text)
+		payloads = []
+		payload_els = root.findall('payloads/payload')
+		for payload_el in payload_els:
+			payloads.append(StoredNodePayload(payload_el.attrib['name'], payload_el.attrib['md5hash']))
 		
-		return StoredNode(node_id, content_type, attributes, payload_names)
+		return StoredNode(node_id, content_type, attributes, payloads)
 		
 	def _read_notebook(self):
 		"""Reads the notebook and returns a StoredNotebook.
@@ -151,10 +154,10 @@ class FileSystemStorage(NotebookStorage):
 			if key is None:
 				raise ParseError('Missing attribute \'key\' in element <attribute>')
 			attributes[attribute_el.get('key')] = attribute_el.text
-#		payload_names = []
+#		payloads = []
 #		payload_name_els = root.findall('payload-names/payload-name')
 #		for payload_name_el in payload_name_els:
-#			payload_names.append(payload_name_el.text)
+#			payloads.append(payload_name_el.text)
 		
 		return StoredNotebook(attributes)
 		
@@ -207,9 +210,9 @@ class FileSystemStorage(NotebookStorage):
 			attribute_el.set('key', key)
 			attribute_el.text = value
 		
-		payload_names_el = et.SubElement(node_el, 'payload-names')
-		for payload_name in stored_node.payload_names:
-			et.SubElement(payload_names_el, 'payload-name').text = payload_name
+		payloads_el = et.SubElement(node_el, 'payloads')
+		for payload in stored_node.payloads:
+			et.SubElement(payloads_el, 'payload', attrib={ 'name': payload.name, 'md5hash': payload.md5hash })
 
 		tree = et.ElementTree(node_el)
 
@@ -230,9 +233,9 @@ class FileSystemStorage(NotebookStorage):
 			attribute_el.set('key', key)
 			attribute_el.text = value
 		
-#		payload_names_el = et.SubElement(node_el, 'payload-names')
-#		for payload_name in stored_node.payload_names:
-#			et.SubElement(payload_names_el, 'payload-name').text = payload_name
+#		payloads_el = et.SubElement(node_el, 'payload-names')
+#		for payload_name in stored_node.payloads:
+#			et.SubElement(payloads_el, 'payload-name').text = payload_name
 
 		tree = et.ElementTree(notebook_el)
 

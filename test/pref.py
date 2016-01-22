@@ -24,6 +24,11 @@ class Test(unittest.TestCase):
  
         self.assertFalse(pref1 == 'asdf')
     
+    def test_init_with_data(self):
+        pref = Pref({ 'level1': { 'level2': { 'key': False }}})
+        
+        self.assertEqual(False, pref.get('level1', 'level2', 'key'))
+    
     def test_is_dirty_1(self):
         pref = Pref()
         

@@ -2,7 +2,6 @@
 
 - "TODO" invullen
 - new child with duplicate id
-- _add_child_node() invoeren -- parent als constructorparameter verwijderen
 - remove node._unsaved_changes from tests
 - Notebook.ui_prefs
   - set attributes -> save -> get attributes
@@ -12,6 +11,12 @@
 - NotebookError
 - NotebookVersionError
 - basetreeview._add_model_column(): get = lambda ...
+- integration test: opening a notebook with 1000 assets takes <= 0.5 seconds
+- integration test: saving a notebook with 1000 assets takes <= 0.5 seconds
+- _add_unbound_node_as_child() invoeren -- notebook en parent als constructorparameter verwijderen en _add_child_node() vervangen
+
+x create_copy()
+- receive_moving_node(node, after)
 
 Notebook
 ?	title
@@ -33,7 +38,6 @@ x	has_children()
 -	get_parent()
 -	get_notebook()
 
-TODO: HIER BEZIG:
 ContentNode/FolderNode/TrashNode
 	modifying order, title_color_* -> is dirty == True
 	saving order, title_color_*

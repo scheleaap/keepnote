@@ -1,8 +1,11 @@
 """Base class for classes that can store notebooks."""
 
+import hashlib
+
 __all__ = [
 		'StoredNotebook',
 		'StoredNode',
+		'StoredNodePayload',
 		'NotebookStorage',
 		'NodeAlreadyExistsError',
 		'NodeDoesNotExistError',
@@ -23,7 +26,7 @@ class StoredNotebook(object):
 
 	def __eq__(self, other):
 		return \
-			isinstance(other, StoredNotebook) and \
+			isinstance(other, self.__class__) and \
 			self.attributes == other.attributes
 
 	def __ne__(self, other):
@@ -35,32 +38,76 @@ class StoredNotebook(object):
 class StoredNode(object):
 	"""Represents a node stored in the NotebookStorage."""
 
-	def __init__(self, node_id, content_type, attributes, payload_names):
+	def __init__(self, node_id, content_type, attributes, payloads):
 		"""Constructor.
 		
 		@param node_id: The id of the new node.
 		@param content_type: The content type of the node.
 		@param attributes: The attributes of the node.
-		@param payload_names: The names of the payloads of the node.
+		@param payloads: The metadata of the payloads of the node. A list of StoredNodePayload objects.
 		"""
 		self.node_id = node_id
 		self.content_type = content_type
 		self.attributes = attributes
-		self.payload_names = payload_names
+		self.payloads = payloads
+	
+	def get_payload(self, payload_name):
+		"""Returns a payload by name.
+		
+		@param payload_name: The name of the payload.
+		@raise PayloadDoesNotExistError: If a payload with the name does not exist.
+		"""
+		filtered_payloads = [ payload for payload in self.payloads if payload.name == payload_name ]
+		if filtered_payloads:
+			return filtered_payloads[0]
+		else:
+			raise PayloadDoesNotExistError()
+	
+	def has_payload(self, payload_name):
+		"""Returns whether a payload exists within the node.
+		
+		@param payload_name: The name of the payload.
+		@return Whether a payload exists within the node.
+		"""
+		return len([ payload for payload in self.payloads if payload.name == payload_name ]) != 0
 
 	def __eq__(self, other):
 		return \
-			isinstance(other, StoredNode) and \
+			isinstance(other, self.__class__) and \
 			self.node_id == other.node_id and \
 			self.content_type == other.content_type and \
 			self.attributes == other.attributes and \
-			self.payload_names == other.payload_names
+			self.payloads == other.payloads
 
 	def __ne__(self, other):
 		return not self.__eq__(other);
 
 	def __repr__(self):
-		return 'StoredNode[{node_id}, {content_type}, {attributes}, {payload_names}]'.format(**self.__dict__)
+		return '{cls}[{node_id}, {content_type}, {attributes}, {payloads}]'.format(cls=self.__class__.__name__, **self.__dict__)
+
+class StoredNodePayload(object):
+	"""Contains payload metadata of a StoredNode."""
+	
+	def __init__(self, name, md5hash):
+		"""Constructor.
+		
+		@param name: The name of the payload.
+		@param md5hash: The hash of the payload.
+		"""
+		self.name = name
+		self.md5hash = md5hash
+	
+	def __eq__(self, other):
+		return \
+			isinstance(other, self.__class__) and \
+			self.name == other.name and \
+			self.md5hash == other.md5hash
+	
+	def __ne__(self, other):
+		return not self.__eq__(other);
+	
+	def __repr__(self):
+		return '{cls}[{name}, {md5hash}]'.format(cls=self.__class__.__name__, **self.__dict__)
 
 class NotebookStorage:
 	"""Classes implementing this interface can store notebooks.
@@ -118,7 +165,7 @@ class NotebookStorage:
 		@param payload_name: The name of the payload.
 		@return: A file-like object with the payload data.
 		@raise NodeDoesNotExistError: If a node with the id does not exist.
-		@raise PayloadDoesNotExistError: If a payload with the same name does not exist.
+		@raise PayloadDoesNotExistError: If a payload with the name does not exist.
 		@raise IOError: If the payload cannot be read.
 		"""
 		raise NotImplementedError(self.get_node_payload.__name__)
@@ -163,7 +210,7 @@ class NotebookStorage:
 		@param node_id: The id of the node.
 		@param payload_name: The name of the payload to remove.
 		@raise NodeDoesNotExistError: If a node with the id does not exist.
-		@raise PayloadDoesNotExistError: If a payload with the same name does not exist.
+		@raise PayloadDoesNotExistError: If a payload with the name does not exist.
 		@raise IOError: If the payload cannot be deleted.
 		"""
 		raise NotImplementedError(self.remove_node_payload.__name__)

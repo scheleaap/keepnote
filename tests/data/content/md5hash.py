@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-import base64
+import hashlib
 import io
 import logging
 
@@ -23,7 +23,6 @@ if __name__ == '__main__':
     with io.open(args.file, 'rb') as f:
         data = f.read()
     
-    data = base64.b64encode(data)
+    hash = hashlib.md5(data).hexdigest()
     
-    with io.open('{:s}.base64'.format(args.file), 'wb') as f:
-        f.write(data)
+    print('{file}: {hash}'.format(file=args.file, hash=hash))
