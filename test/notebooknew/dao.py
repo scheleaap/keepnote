@@ -980,7 +980,6 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				modified_time = None
 		
 		node = ContentNode(
-				notebook_storage=None,
 				notebook=notebook,
 				content_type=content_type,
 				parent=parent,
@@ -1384,7 +1383,6 @@ class FolderNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				modified_time = None
 		
 		node = FolderNode(
-				notebook_storage=None,
 				notebook=notebook,
 				parent=parent,
 				loaded_from_storage=loaded_from_storage,
@@ -1543,7 +1541,6 @@ class TrashNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 				modified_time = None
 		
 		node = TrashNode(
-				notebook_storage=None,
 				notebook=notebook,
 				parent=parent,
 				loaded_from_storage=loaded_from_storage,
@@ -1652,7 +1649,6 @@ class TestNotebookNodeDao(NotebookNodeDao):
 			title = ''
 		
 		return TestNotebookNode(
-				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=None,
 				loaded_from_storage=True,

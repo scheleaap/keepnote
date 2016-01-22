@@ -539,11 +539,10 @@ class AbstractContentFolderNode(NotebookNode):
 	
 	def delete(self):
 		"""TODO"""
-		if self.parent is None:
-			raise IllegalOperationError('Cannot delete the root node')
 		for child in self._children:
 			child.delete()
-		self.parent._remove_child_node(self)
+		if self.parent is not None:
+			self.parent._remove_child_node(self)
 		self.is_deleted = True
 	
 	def is_node_a_child(self, node):
@@ -663,10 +662,10 @@ class ContentNode(AbstractContentFolderNode):
 				modified_time=modified_time,
 				)
 		if loaded_from_storage:
-			if node_id is None or main_payload is None or additional_payloads is None:
+			if main_payload is None or additional_payloads is None:
 				raise IllegalArgumentCombinationError()
 		else:
-			if node_id is not None or main_payload is None or additional_payloads is None:
+			if main_payload is None or additional_payloads is None:
 				raise IllegalArgumentCombinationError()
 		
 		if main_payload is not None: # TODO Remove
@@ -823,12 +822,6 @@ class FolderNode(AbstractContentFolderNode):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if loaded_from_storage:
-			if node_id is None:
-				raise IllegalArgumentCombinationError()
-		else:
-			if node_id is not None:
-				raise IllegalArgumentCombinationError()
 	
 	def copy(self, target, with_subtree, behind=None):
 		if self.is_deleted:
@@ -926,12 +919,6 @@ class TrashNode(NotebookNode):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if loaded_from_storage:
-			if node_id is None:
-				raise IllegalArgumentCombinationError()
-		else:
-			if node_id is not None:
-				raise IllegalArgumentCombinationError()
 
 	def add_new_node_as_child(self, child_node):
 		raise IllegalOperationError('Cannot add a child node to the trash')

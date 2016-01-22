@@ -357,7 +357,6 @@ class ContentNodeDao(NotebookNodeDao):
 				for payload in sn.payloads if payload.name != main_payload_name
 				]
 		nn = ContentNode(
-				notebook_storage=notebook_storage,
 				notebook=notebook,
 				content_type=sn.content_type,
 				parent=None,
@@ -422,7 +421,6 @@ class AbstractFolderTrashNodeDao(NotebookNodeDao):
 		client_preferences = get_attribute_value(CLIENT_PREFERENCES_ATTRIBUTE, sn.attributes)
 		
 		nn = self.cls(
-				notebook_storage=notebook_storage,
 				notebook=notebook,
 				parent=None,
 				loaded_from_storage=True,

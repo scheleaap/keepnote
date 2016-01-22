@@ -261,14 +261,6 @@ class ContentFolderTrashNodeTestBase(object):
 		"""Creates a node of the class under test."""
 		raise NotImplementedError()
 	
-	def _assert_proper_copy_call_on_mock(self, target_mock, original, behind):
-		"""Asserts that the proper method to copy a node of the class under test was invoked on a target mock object."""
-		raise NotImplementedError()
-	
-	def _get_proper_copy_method(self, target_mock):
-		"""Returns the proper method to copy a node of the class under test on a mock object."""
-		raise NotImplementedError()
-	
 	def test_create_new_n(self):
 		parent = TestNotebookNode()
 		
@@ -777,7 +769,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(False, node.is_in_trash)
 	
 	def test_title_set_if_deleted(self):
-		node = self._create_node(title=DEFAULT_TITLE, loaded_from_storage=False)
+		parent = TestNotebookNode()
+		node = self._create_node(parent=parent, title=DEFAULT_TITLE, loaded_from_storage=False)
 		node.delete()
 		
 		with self.assertRaises(IllegalOperationError):
@@ -900,7 +893,9 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual(True, node.can_delete())
+		
 		node.delete()
+		
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.is_deleted)
 		self.assertEqual(False, node in parent.children)
@@ -936,22 +931,6 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual(True, node in parent.children)
-	
-	def test_delete_if_root(self):
-		node = self._create_node(parent=None, loaded_from_storage=True)
-		child = Mock(spec=NotebookNode)
-		child.parent = node
-		node._add_child_node(child)
-		
-		self.assertEqual(False, node.can_delete())
-		
-		with self.assertRaises(IllegalOperationError):
-			node.delete()
-		
-		self.assertEqual(False, child.delete.called)
-## TODO: Nodig?		self.assertEqual([child], node.children)
-# 		self.assertEqual(False, node.is_dirty)
-		self.assertEqual(False, node.is_deleted)
 	
 	def test_move(self):
 		"""Tests moving a node."""
@@ -1198,18 +1177,6 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		if parent is not None:
 			parent._add_child_node(node)
 		return node
-	
-	def _assert_proper_copy_call_on_mock(self, target_mock, original, behind):
-		target_mock.new_content_child_node.assert_called_once_with(
-				content_type=original.content_type,
-				title=original.title,
-				main_payload=original.payloads[original.main_payload_name].copy(),
-				additional_payloads=[original.payloads[additional_payload_name].copy() for additional_payload_name in original.additional_payload_names],
-				behind=behind
-				)
-	
-	def _get_proper_copy_method(self, target_mock):
-		return target_mock.new_content_child_node
 	
 	def test_create_c(self):
 		parent = TestNotebookNode()
@@ -1546,15 +1513,6 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		if parent is not None:
 			parent._add_child_node(node)
 		return node
-	
-	def _assert_proper_copy_call_on_mock(self, target_mock, original, behind):
-		target_mock.new_folder_child_node.assert_called_once_with(
-				title=original.title,
-				behind=behind
-				)
-	
-	def _get_proper_copy_method(self, target_mock):
-		return target_mock.new_folder_child_node
 
 
 class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
@@ -1608,15 +1566,6 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 		if parent is not None:
 			parent._add_child_node(node)
 		return node
-
-	def _assert_proper_copy_call_on_mock(self, target_mock, original, behind):
-		target_mock.new_folder_child_node.assert_called_once_with(
-				title=original.title,
-				behind=behind
-				)
-	
-	def _get_proper_copy_method(self, target_mock):
-		return target_mock.new_folder_child_node
 	
 	def test_is_trash(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
