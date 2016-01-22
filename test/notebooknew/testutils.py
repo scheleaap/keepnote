@@ -74,11 +74,10 @@ DEFAULT_JPG_PAYLOAD_HASH = hashlib.md5(DEFAULT_JPG_PAYLOAD_DATA).hexdigest()
 class TestNotebookNode(NotebookNode):
 	"""A testing implementation of NotebookNode."""
 
-	def __init__(self, notebook_storage=None, notebook=None, parent=None, add_to_parent=None, loaded_from_storage=True, title=DEFAULT_TITLE, node_id=None):
+	def __init__(self, notebook=None, parent=None, add_to_parent=None, loaded_from_storage=True, title=DEFAULT_TITLE, node_id=None):
 		if node_id is None:
 			node_id = new_node_id()
 		super(TestNotebookNode, self).__init__(
-				notebook_storage=notebook_storage,
 				notebook=notebook,
 				content_type=CONTENT_TYPE_TEST,
 				parent=parent,
@@ -87,9 +86,9 @@ class TestNotebookNode(NotebookNode):
 				node_id=node_id,
 				)
 		
-		self._is_deleted = False
-		self._is_dirty = False
-		self._is_in_trash = False
+		self.is_dirty = False
+		self._create_copy_result_override = None
+		self._is_in_trash_override = False
 		
 		if self.parent is not None:
 			if add_to_parent is None:
@@ -97,13 +96,18 @@ class TestNotebookNode(NotebookNode):
 			elif add_to_parent == True:
 				self.parent._add_child_node(self)
 	
-	@property
-	def is_dirty(self):
-		return self._is_dirty
+	def create_copy(self, with_subtree):
+		if self._create_copy_result_override is not None:
+			return self._create_copy_result_override
+		
+		raise NotImplementedError('TODO')
+	
+	def delete(self):
+		self.is_deleted = True
 	
 	@property
 	def is_in_trash(self):
-		return False
+		return self._is_in_trash_override
 	
 	@property
 	def is_root(self):
@@ -114,14 +118,11 @@ class TestNotebookNode(NotebookNode):
 	def is_trash(self):
 		return False
 	
-	def set_is_deleted(self, value):
-		self.is_deleted = value
-	
-	def set_is_dirty(self, value):
-		self._is_dirty = value
+	def set_create_copy_result(self, value):
+		self._create_copy_result_override = value
 	
 	def set_is_in_trash(self, value):
-		self._is_in_trash = value
+		self._is_in_trash_override = value
 
 
 class TestPayload(NotebookNodePayload):
