@@ -19,7 +19,7 @@ x create_copy()
 - receive_moving_node(node, after)
 
 Notebook
-?	title
+x	title
 	default_font   The default font for new nodes.
 	icons          A set of icons that can be assigned to nodes.
 x	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)

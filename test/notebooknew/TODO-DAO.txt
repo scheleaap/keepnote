@@ -2,7 +2,7 @@ Do something more intelligent in the test_validation_*() methods
 Create root node after first sync
 Create trash on first delete
 Implement node timestamp in NotebookStorage
-Implement new in local, new in remote, changed in local sync
+Implement nodes: new in local, new in remote, changed in local sync
 x	content_type
 x	parent_id
 x	title
@@ -23,6 +23,9 @@ Implement changed in remote sync
 	payload
 Implement deleted in remote (a disabled test exists in StructureTest)
 Additional attributes in storage kept, not overwritten
+Implement notebook
+	title
+
 
 # Things to migrate:
 

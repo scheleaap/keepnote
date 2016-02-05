@@ -66,11 +66,19 @@ def datetime_to_timestamp(dt):
 	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
 
+class NotebookTest(unittest.TestCase):
+	def _create_notebook(self,
+			title=DEFAULT_TITLE
+			):
+		return Notebook(
+				title=title,
+				)
+	
 	def test_client_preferences(self):
 		"""Test the setting and getting of Notebook client preferences."""
 		
 		# Initialize Notebook.
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		
 		expected = Pref()
 		self.assertEqual(expected, notebook.client_preferences)
@@ -86,7 +94,7 @@ def datetime_to_timestamp(dt):
 	def test_close_without_changes(self):
 		handler = Mock()
 		
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		notebook.closing_listeners.add(handler.on_closing)
 		notebook.close_listeners.add(handler.on_close)
 		
@@ -108,7 +116,7 @@ def datetime_to_timestamp(dt):
 	def get_client_event_listeners(self):
 		handler = Mock()
 		
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		notebook.get_client_event_listeners("my-event").add(handler.on_event)
 	
 	def test_has_node(self):
@@ -117,7 +125,7 @@ def datetime_to_timestamp(dt):
 		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		notebook.root = root
 
 		self.assertEqual(True, notebook.has_node(root.node_id))
@@ -133,7 +141,7 @@ def datetime_to_timestamp(dt):
 		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		notebook.root = root
 
 		self.assertEqual(root, notebook.get_node_by_id(root.node_id))
@@ -143,9 +151,24 @@ def datetime_to_timestamp(dt):
 		self.assertEqual(child121, notebook.get_node_by_id(child121.node_id))
 		with self.assertRaises(NodeDoesNotExistError):
 			notebook.get_node_by_id('other_id')
+	
+	def test_title_init_set(self):
+		"""Tests setting the title of a notebook."""
+		notebook = Notebook(title=DEFAULT_TITLE)
 		
+		self.assertEqual(DEFAULT_TITLE, notebook.title)
+
+		# Change the notebook's title.
+		notebook.title = 'new title'
+		
+		self.assertEqual('new title', notebook.title)
+# 		self.assertEqual(True, notebook.is_dirty)
+
 
 class ContentFolderTrashNodeTestBase(object):
+	def _create_notebook(self):
+		return Notebook(title=DEFAULT_TITLE)
+	
 	def _create_node(
 			self,
 			notebook=None,
@@ -588,7 +611,7 @@ class ContentFolderTrashNodeTestBase(object):
 		assert_that(copy.client_preferences, is_not(same_instance(node.client_preferences)))
 	
 	def test_create_copy(self):
-		node = self._create_node(notebook=Notebook(), loaded_from_storage=False)
+		node = self._create_node(notebook=self._create_notebook(), loaded_from_storage=False)
 		
 		copy = node.create_copy(with_subtree=False)
 		
@@ -661,14 +684,14 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertNotEquals('new title', node.title)
 	
 	def test_content_type_create_copy(self):
-		node = self._create_node(loaded_from_storage=False)
 		
+		node = self._create_node(loaded_from_storage=False)
 		copy = node.create_copy(with_subtree=False)
 		
 		assert_that(copy.content_type, equal_to(node.content_type))
 	
 	def test_add_new_node_as_child(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		node = self._create_node(notebook=notebook, loaded_from_storage=False)
 		child = TestNotebookNode(notebook=None, parent=None)
 		
@@ -681,7 +704,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(same_instance(node)))
 	
 	def test_add_new_node_as_child_child_notebook_not_none(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		node = self._create_node(notebook=notebook, loaded_from_storage=False)
 		child = TestNotebookNode(notebook=notebook, parent=None)
 		
@@ -693,7 +716,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_add_new_node_as_child_child_parent_not_none(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		node = self._create_node(notebook=notebook, loaded_from_storage=False)
 		other_parent = TestNotebookNode()
 		child = TestNotebookNode(parent=other_parent, add_to_parent=True)
@@ -706,7 +729,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(same_instance(other_parent)))
 	
 	def test_add_new_node_as_child_child_deleted(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		node = self._create_node(notebook=notebook, loaded_from_storage=False)
 		child = TestNotebookNode()
 		child.delete()
@@ -719,7 +742,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_add_new_node_as_child_node_deleted(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		parent = TestNotebookNode()
 		node = self._create_node(notebook=notebook, parent=parent, loaded_from_storage=False)
 		node.delete()
@@ -735,7 +758,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_add_new_node_as_child_node_in_trash_1(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		parent = Mock(spec=NotebookNode)
 		parent.is_trash = True
 		parent.is_in_trash = False
@@ -752,7 +775,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_add_new_node_as_child_node_in_trash_2(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		parent = Mock(spec=NotebookNode)
 		parent.is_trash = False
 		parent.is_in_trash = True
@@ -1309,7 +1332,7 @@ class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
 		assert_that(copy.content_type, equal_to(CONTENT_TYPE_FOLDER))
 		
 	def test_add_new_node_as_child(self):
-		notebook = Notebook()
+		notebook = self._create_notebook()
 		node = self._create_node(notebook=notebook, loaded_from_storage=False)
 		child = TestNotebookNode(notebook=None, parent=None)
 		

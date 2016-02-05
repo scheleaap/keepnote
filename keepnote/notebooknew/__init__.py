@@ -89,6 +89,7 @@ class Notebook(object):
 	
 	@ivar root: The root NotebookNode.
 	@ivar trash: TODO
+	@ivar title: The title of the notebook.
 	@ivar client_preferences: A Pref containing the notebook's client preferences.
 	@ivar node_changed_listeners: TODO
 	@ivar closing_listeners: TODO
@@ -96,11 +97,12 @@ class Notebook(object):
 	@ivar is_dirty: TODO
 	"""
 	
-	def __init__(self):
+	def __init__(self, title):
 		"""Constructor.
 		"""
 		self.root = None
 		self.trash = None
+		self.title = title
 		self.client_preferences = Pref()
 		self.node_changed_listeners = Listeners()
 		self.closing_listeners = Listeners()
