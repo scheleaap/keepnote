@@ -19,6 +19,8 @@ class TestBase(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
 		parentdir = os.path.dirname(os.path.dirname(__file__))
+		if parentdir == '':
+			parentdir = '.'
 
 		# Clean up old testing directories.
 		for d in os.listdir(parentdir):

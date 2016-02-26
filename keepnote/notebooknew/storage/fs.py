@@ -20,7 +20,7 @@ class FileSystemStorage(NotebookStorage):
 		self.log = logging.getLogger('{m}.{c}'.format(m=self.__class__.__module__, c=self.__class__.__name__));
 		self.dir = dir
 
-		self.log.debug('dir={0}'.format(self.dir))
+		self.log.debug(u'dir={0}'.format(self.dir))
 		if not os.path.exists(self.dir):
 			os.makedirs(self.dir)
 		
@@ -28,6 +28,7 @@ class FileSystemStorage(NotebookStorage):
 			self._write_notebook(StoredNotebook(attributes={}))
 
 	def add_node(self, node_id, content_type, attributes, payloads):
+		self.log.debug(u'Adding node {node_id} with content type {content_type}'.format(node_id=node_id, content_type=content_type))
 		if self.has_node(node_id):
 			raise NodeAlreadyExistsError()
 		
@@ -37,6 +38,7 @@ class FileSystemStorage(NotebookStorage):
 			self.add_node_payload(node_id, payload[0], payload[1])
 
 	def add_node_payload(self, node_id, payload_name, payload_file):
+		self.log.debug(u'Adding payload "{name}" to node {node_id}'.format(node_id=node_id, name=payload_name))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError(node_id)
 		if self.has_node_payload(node_id, payload_name):
@@ -56,20 +58,24 @@ class FileSystemStorage(NotebookStorage):
 		self._write_node(node_id, stored_node)
 	
 	def get_all_nodes(self):
+		self.log.debug(u'Loading all nodes')
 		def handle_error(e):
 			raise e
 		
 		for (dirpath, dirnames, filenames) in os.walk(self.dir, onerror=handle_error):
 			for dirname in dirnames:
 				id = dirname
+				self.log.debug(u'Found a node with id "{node_id}" in {path}'.format(node_id=id, path=dirpath))
 				yield self.get_node(id)
+			break
 	
 	def get_node(self, node_id):
+		self.log.debug(u'Loading node {node_id}'.format(node_id=node_id))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError()
 		
 		return self._read_node(node_id)
-
+	
 	def _get_node_directory_path(self, node_id):
 		return os.path.join(self.dir, node_id)
 	
@@ -80,6 +86,7 @@ class FileSystemStorage(NotebookStorage):
 		return os.path.join(self.dir, 'notebook.xml')
 		
 	def get_node_payload(self, node_id, payload_name):
+		self.log.debug(u'Loading payload "{name}" of node {node_id}'.format(node_id=node_id, name=payload_name))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError(node_id)
 		if not self.has_node_payload(node_id, payload_name):
@@ -94,6 +101,7 @@ class FileSystemStorage(NotebookStorage):
 		return os.path.join(self.dir, node_id, 'payload', payload_name)
 	
 	def get_notebook(self):
+		self.log.debug(u'Loading the notebook')
 		return self._read_notebook()
 	
 	def has_node(self, node_id):
@@ -162,20 +170,27 @@ class FileSystemStorage(NotebookStorage):
 		return StoredNotebook(attributes)
 		
 	def remove_node(self, node_id):
+		self.log.debug(u'Removing node {node_id}'.format(node_id=node_id))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError()
 		
 		shutil.rmtree(self._get_node_directory_path(node_id))
 		
 	def remove_node_payload(self, node_id, payload_name):
+		self.log.debug(u'Removing payload "{name}" from node {node_id}'.format(node_id=node_id, name=payload_name))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError(node_id)
 		if not self.has_node_payload(node_id, payload_name):
 			raise PayloadDoesNotExistError(node_id, payload_name)
 		
 		os.remove(self._get_node_payload_file_path(node_id, payload_name))
+		
+		stored_node = self.get_node(node_id)
+		stored_node.payloads[:] = [payload for payload in stored_node.payloads if payload.name != payload_name]
+		self._write_node(node_id, stored_node)
 	
 	def set_node_attributes(self, node_id, attributes):
+		self.log.debug(u'Updating attributes of node {node_id}'.format(node_id=node_id))
 		if not self.has_node(node_id):
 			raise NodeDoesNotExistError()
 		
@@ -184,6 +199,7 @@ class FileSystemStorage(NotebookStorage):
 		self._write_node(node_id, stored_node)
 		
 	def set_notebook_attributes(self, attributes):
+		self.log.debug(u'Updating attributes of notebook')
 		stored_notebook = self._read_notebook()
 		stored_notebook.attributes = attributes
 		self._write_notebook(stored_notebook)
@@ -216,7 +232,7 @@ class FileSystemStorage(NotebookStorage):
 
 		tree = et.ElementTree(node_el)
 
-		self.log.debug('Writing node {node_id} to {path}'.format(node_id=node_id, path=node_file_path))
+		self.log.debug(u'Writing node {node_id} to {path}'.format(node_id=node_id, path=node_file_path))
 		tree.write(node_file_path, encoding='utf-8', xml_declaration=True)#, pretty_print=True
 
 	def _write_notebook(self, stored_notebook):
@@ -239,7 +255,7 @@ class FileSystemStorage(NotebookStorage):
 
 		tree = et.ElementTree(notebook_el)
 
-		self.log.debug('Writing notebook to {path}'.format(path=path))
+		self.log.debug(u'Writing notebook to {path}'.format(path=path))
 		tree.write(path, encoding='utf-8', xml_declaration=True)#, pretty_print=True
 
 	def __repr__(self):

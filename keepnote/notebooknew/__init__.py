@@ -1,4 +1,4 @@
-
+ 
 from collections import namedtuple, OrderedDict
 from datetime import datetime
 import io
@@ -97,7 +97,7 @@ class Notebook(object):
 	@ivar is_dirty: TODO
 	"""
 	
-	def __init__(self, title):
+	def __init__(self, title=None):
 		"""Constructor.
 		"""
 		self.root = None

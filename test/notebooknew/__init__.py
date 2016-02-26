@@ -24,34 +24,6 @@ from test.notebooknew.testutils import *
 
 MS = 0.001  # 1 millisecond in seconds
 
-PARENT_ID_ATTRIBUTE = 'parent_id'
-MAIN_PAYLOAD_NAME_ATTRIBUTE = 'main_payload_name'
-TITLE_ATTRIBUTE = 'title'
-CREATED_TIME_ATTRIBUTE = 'created_time'
-MODIFIED_TIME_ATTRIBUTE = 'modified_time'
-ORDER_ATTRIBUTE = 'order'
-ICON_NORMAL_ATTRIBUTE = 'icon'
-ICON_OPEN_ATTRIBUTE = 'icon_open'
-TITLE_COLOR_FOREGROUND_ATTRIBUTE = 'title_fgcolor'
-TITLE_COLOR_BACKGROUND_ATTRIBUTE = 'title_bgcolor'
-CLIENT_PREFERENCES_ATTRIBUTE = 'client_preferences'
-
-# The following StoredNodes and NotebookNodes have the following structure:
-# root
-#   child1
-#     child11
-#     child12
-#       child121
-#   child2
-#     child21
-ROOT_SN = StoredNode('root_id', CONTENT_TYPE_FOLDER, attributes={TITLE_ATTRIBUTE: 'root'}, payloads=[])
-CHILD1_SN = StoredNode('child1_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child1'}, payloads=[])
-CHILD11_SN = StoredNode('child11_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child11'}, payloads=[])
-CHILD12_SN = StoredNode('child12_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child1_id', TITLE_ATTRIBUTE: 'child12'}, payloads=[])
-CHILD121_SN = StoredNode('child121_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child12_id', TITLE_ATTRIBUTE: 'child121'}, payloads=[])
-CHILD2_SN = StoredNode('child2_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'child2'}, payloads=[])
-CHILD21_SN = StoredNode('child21_id', CONTENT_TYPE_FOLDER, attributes={PARENT_ID_ATTRIBUTE: 'child2_id', TITLE_ATTRIBUTE: 'child21'}, payloads=[])
-TRASH_SN = StoredNode('trash_id', CONTENT_TYPE_TRASH, attributes={PARENT_ID_ATTRIBUTE: 'root_id', TITLE_ATTRIBUTE: 'trash'}, payloads=[])
 
 
 def add_stored_node(notebook_storage, sn):
