@@ -219,7 +219,7 @@ class RichTextEditor (KeepNoteEditor):
 
     def set_notebook(self, notebook):
         """Set notebook for editor"""
-        # set new notebook
+        self.log.debug('Setting the notebook to {notebook}'.format(notebook=notebook))
         self._notebook = notebook
 
         if self._notebook:
@@ -259,8 +259,7 @@ class RichTextEditor (KeepNoteEditor):
         if self._notebook:
             # read default font
             self._textview.set_default_font(
-                self._notebook.pref.get("default_font",
-                                        default=DEFAULT_FONT))
+                self._notebook.client_preferences.get("default_font", default=DEFAULT_FONT))
 
     def is_focus(self):
         """Return True if text editor has focus"""
@@ -295,9 +294,7 @@ class RichTextEditor (KeepNoteEditor):
         self.save()
         self._save_cursor()
 
-        pages = [node for node in nodes
-                 if node.get_attr("content_type") ==
-                 notebooklib.CONTENT_TYPE_PAGE]
+        pages = [node for node in nodes if node.content_type == notebooklib.CONTENT_TYPE_PAGE]
 
         if len(pages) == 0:
             self.clear_view()
@@ -1412,7 +1409,7 @@ class EditorMenus (gobject.GObject):
         # init colors
         notebook = self._editor.get_notebook()
         if notebook:
-            colors = notebook.pref.get("colors", default=DEFAULT_COLORS)
+            colors = notebook.client_preferences.get("colors", default=DEFAULT_COLORS)
         else:
             colors = DEFAULT_COLORS
 
@@ -1423,13 +1420,13 @@ class EditorMenus (gobject.GObject):
         self.fg_color_button.set_homogeneous(False)
         self.fg_color_button.connect(
             "set-color",
-            lambda w, color: self._on_color_set(
-                "fg", self.fg_color_button, color))
+            lambda w, color: self._on_color_set("fg", self.fg_color_button, color)
+            )
         self.fg_color_button.connect(
             "set-colors",
-            lambda w, colors: self._on_colors_set(colors))
-        replace_widget("/main_tool_bar/Viewer/Editor/Font Fg Color Tool",
-                       self.fg_color_button)
+            lambda w, colors: self._on_colors_set(colors)
+            )
+        replace_widget("/main_tool_bar/Viewer/Editor/Font Fg Color Tool", self.fg_color_button)
 
         # font bg color
         self.bg_color_button = BgColorTool(14, 15, "#ffffff")
@@ -1437,21 +1434,20 @@ class EditorMenus (gobject.GObject):
         self.bg_color_button.set_homogeneous(False)
         self.bg_color_button.connect(
             "set-color",
-            lambda w, color: self._on_color_set(
-                "bg", self.bg_color_button, color))
+            lambda w, color: self._on_color_set("bg", self.bg_color_button, color)
+            )
         self.bg_color_button.connect(
             "set-colors",
-            lambda w, colors: self._on_colors_set(colors))
-        replace_widget("/main_tool_bar/Viewer/Editor/Font Bg Color Tool",
-                       self.bg_color_button)
+            lambda w, colors: self._on_colors_set(colors)
+            )
+        replace_widget("/main_tool_bar/Viewer/Editor/Font Bg Color Tool", self.bg_color_button)
 
         # get spell check toggle
         self.spell_check_toggle = \
             uimanager.get_widget("/main_menu_bar/Tools/Viewer/Spell Check")
         self.spell_check_toggle.set_sensitive(
             self._editor.get_textview().can_spell_check())
-        self.spell_check_toggle.set_active(window.get_app().pref.get(
-            "editors", "general", "spell_check", default=True))
+        self.spell_check_toggle.set_active(window.get_app().pref.get("editors", "general", "spell_check", default=True))
 
 
 class ComboToolItem(gtk.ToolItem):

@@ -117,6 +117,7 @@ class MultiEditor (KeepNoteEditor):
 
     def set_notebook(self, notebook):
         """Set notebook for editor"""
+        self.log.debug('Setting the notebook to {notebook}'.format(notebook=notebook))
         self._notebook = notebook
         if self._editor:
             self._editor.set_notebook(notebook)
@@ -228,7 +229,7 @@ class ContentEditor (MultiEditor):
         if len(nodes) != 1:
             MultiEditor.view_nodes(self, [])
         else:
-            content_type = nodes[0].get_attr("content_type").split("/")
+            content_type = nodes[0].content_type.split("/")
 
             for i in xrange(len(content_type), 0, -1):
                 editor = self._editors.get("/".join(content_type[:i]), None)

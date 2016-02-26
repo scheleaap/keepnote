@@ -114,6 +114,7 @@ class KeepNoteTreeView (basetreeview.KeepNoteBaseTreeView):
 
     def set_notebook(self, notebook):
         basetreeview.KeepNoteBaseTreeView.set_notebook(self, notebook)
+        self.log.debug('Setting the notebook to {notebook} [KeepNoteTreeView]'.format(notebook=notebook))
 
         if self._notebook is None:
             self.model.set_root_nodes([])
@@ -122,7 +123,7 @@ class KeepNoteTreeView (basetreeview.KeepNoteBaseTreeView):
         else:
             self.set_sensitive(True)
 
-            root = self._notebook
+            root = self._notebook.root
             model = self.model
 
             self.set_model(None)
@@ -131,13 +132,12 @@ class KeepNoteTreeView (basetreeview.KeepNoteBaseTreeView):
 
             self._setup_columns()
 
-            if root.get_attr("expanded", True):
+            if root.client_preferences.get("expanded", default=True):
                 self.expand_to_path((0,))
 
     def edit_node(self, node):
         path = treemodel.get_path_from_node(
             self.model, node,
             self.rich_model.get_node_column_pos())
-        gobject.idle_add(lambda: self.set_cursor_on_cell(
-            path, self.column, self.title_text, True))
+        gobject.idle_add(lambda: self.set_cursor_on_cell(path, self.column, self.title_text, True))
         #gobject.idle_add(lambda: self.scroll_to_cell(path))

@@ -25,6 +25,7 @@
 #
 
 # python imports
+import logging
 import urllib
 
 # pygtk imports
@@ -40,9 +41,10 @@ from keepnote import unicode_gtk
 from keepnote.notebook import NoteBookError
 from keepnote.gui.icons import get_node_icon
 from keepnote.gui.treemodel import \
-    get_path_from_node, iter_children
+    get_path_from_node, iter_children, TreeModelColumn
 from keepnote.gui import treemodel, CLIPBOARD_NAME
 from keepnote.timestamp import get_str_timestamp
+from keepnote.notebook import AttrDefs, g_default_attr_defs
 
 _ = keepnote.translate
 
@@ -88,13 +90,11 @@ def compute_new_path(model, target, drop_position):
     elif drop_position == gtk.TREE_VIEW_DROP_AFTER:
         return path[:-1] + (path[-1] + 1,)
     else:
-        raise Exception("unknown drop position %s" %
-                        str(drop_position))
+        raise Exception("unknown drop position %s" % str(drop_position))
 
 
 class TextRendererValidator (object):
-    def __init__(self, format=lambda x: x, parse=lambda x: x,
-                 validate=lambda x: True):
+    def __init__(self, format=lambda x: x, parse=lambda x: x, validate=lambda x: True):
 
         def parse2(x):
             if not validate(x):
@@ -110,6 +110,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
     def __init__(self):
         gtk.TreeView.__init__(self)
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
 
         self.model = None
         self.rich_model = None
@@ -197,6 +198,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         return self._master_node
 
     def set_notebook(self, notebook):
+        self.log.debug('Setting the notebook to {notebook} [KeepNoteBaseTreeView]'.format(notebook=notebook))
         self._notebook = notebook
 
         # NOTE: not used yet
@@ -220,6 +222,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
     def set_model(self, model):
         """Set the model for the view"""
+        self.log.debug('Setting the model to {model} [KeepNoteBaseTreeView]'.format(model=model))
 
         # TODO: could group signal IDs into lists, for each detach
         # if model already attached, disconnect all of its signals
@@ -249,21 +252,14 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
             # init signals for model
             self.rich_model.set_notebook(self._notebook)
-            self.changed_start_id = self.rich_model.connect(
-                "node-changed-start", self._on_node_changed_start)
-            self.changed_end_id = self.rich_model.connect(
-                "node-changed-end", self._on_node_changed_end)
+            self.changed_start_id = self.rich_model.connect("node-changed-start", self._on_node_changed_start)
+            self.changed_end_id = self.rich_model.connect("node-changed-end", self._on_node_changed_end)
             self._node_col = self.rich_model.get_node_column_pos()
-            self._get_icon = lambda row: \
-                self.model.get_value(
-                    row, self.rich_model.get_column_by_name("icon").pos)
+            self._get_icon = lambda row: self.model.get_value(row, self.rich_model.get_column_by_name("icon").pos)
 
-            self.insert_id = self.model.connect("row-inserted",
-                                                self.on_row_inserted)
-            self.delete_id = self.model.connect("row-deleted",
-                                                self.on_row_deleted)
-            self.has_child_id = self.model.connect(
-                "row-has-child-toggled", self.on_row_has_child_toggled)
+            self.insert_id = self.model.connect("row-inserted", self.on_row_inserted)
+            self.delete_id = self.model.connect("row-deleted", self.on_row_deleted)
+            self.has_child_id = self.model.connect("row-has-child-toggled", self.on_row_has_child_toggled)
 
     def set_popup_menu(self, menu):
         self._menu = menu
@@ -308,56 +304,77 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         # make sure icon attributes are in model
         self._add_model_column(self._attr_icon)
         self._add_model_column(self._attr_icon_open)
-
+        
+# WOUT
+        # make sure title color attributes are in the model
+        self._add_model_column("title_color_background")
+        self._add_model_column("title_color_foreground")
+#         model_column = TreeModelColumn(
+#                 name="title_bgcolor",
+#                 coltype=str,
+#                 get=lambda node: node.title_color_background
+#                 )
+#         self.rich_model.append_column(model_column)
+#         model_column = TreeModelColumn(
+#                 name="title_fgcolor",
+#                 coltype=str,
+#                 get=lambda node: node.title_color_foreground
+#                 )
+#         self.rich_model.append_column(model_column)
+ 
         # add renders
-        cell_icon = self._add_pixbuf_render(
-            column, self._attr_icon, self._attr_icon_open)
+        cell_icon = self._add_pixbuf_render(column, self._attr_icon, self._attr_icon_open)
         title_text = self._add_text_render(
-            column, attr, editable=True,
-            validator=TextRendererValidator(validate=lambda x: x != ""))
+                column,
+                attr,
+                editable=True,
+                validator=TextRendererValidator(validate=lambda x: x != ""))
 
         # record reference to title_text renderer
         self.title_text = title_text
 
         return cell_icon, title_text
 
-    def _add_text_render(self, column, attr, editable=False,
-                         validator=TextRendererValidator()):
+    def _add_text_render(self, column, attr, editable=False, validator=TextRendererValidator()):
+        self.log.debug(
+                'Adding a text renderer for column {column}, attribute "{attr}", editable={editable}'
+                .format(column=column, attr=attr, editable=editable))
+        
         # cell renderer text
         cell = gtk.CellRendererText()
         cell.set_fixed_height_from_font(1)
         column.pack_start(cell, True)
-        column.add_attribute(cell, 'text',
-                             self.rich_model.get_column_by_name(attr).pos)
+        column.add_attribute(cell, 'text', self.rich_model.get_column_by_name(attr).pos)
 
         column.add_attribute(
-            cell, 'cell-background',
-            self.rich_model.add_column(
-                "title_bgcolor", str,
-                lambda node: node.get_attr("title_bgcolor", None)).pos)
+                cell_renderer=cell,
+                attribute='cell-background',
+                column=self.rich_model.get_column_by_name("title_color_background").pos
+                )
+        
         column.add_attribute(
-            cell, 'foreground',
-            self.rich_model.add_column(
-                "title_fgcolor", str,
-                lambda node: node.get_attr("title_fgcolor", None)).pos)
+                cell_renderer=cell,
+                attribute='foreground',
+                column=self.rich_model.get_column_by_name("title_color_foreground").pos
+                )
 
         # set edit callbacks
         if editable:
-            cell.connect("edited", lambda r, p, t: self.on_edit_attr(
-                r, p, attr, t, validator=validator))
-            cell.connect("editing-started", lambda r, e, p:
-                         self.on_editing_started(r, e, p, attr, validator))
+            cell.connect("edited", lambda r, p, t: self.on_edit_attr(r, p, attr, t, validator=validator))
+            cell.connect("editing-started", lambda r, e, p: self.on_editing_started(r, e, p, attr, validator))
             cell.connect("editing-canceled", self.on_editing_canceled)
             cell.set_property("editable", True)
 
         return cell
 
     def _add_pixbuf_render(self, column, attr, attr_open=None):
+        self.log.debug(
+                'Adding a pixbuf renderer for column {column}, attribute "{attr}", attribute open "{attr_open}"'
+                .format(column=column, attr=attr, attr_open=attr_open))
 
         cell = gtk.CellRendererPixbuf()
         column.pack_start(cell, False)
-        column.add_attribute(cell, 'pixbuf',
-                             self.rich_model.get_column_by_name(attr).pos)
+        column.add_attribute(cell, 'pixbuf', self.rich_model.get_column_by_name(attr).pos)
         #column.add_attribute(
         #    cell, 'cell-background',
         #    self.rich_model.add_column(
@@ -371,15 +388,16 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
         return cell
 
-    def _get_model_column(self, attr, mapfunc=lambda x: x):
-        col = self.rich_model.get_column_by_name(attr)
-        if col is None:
-            self._add_model_column(attr, add_sort=False, mapfunc=mapfunc)
-            col = self.rich_model.get_column_by_name(attr)
-        return col
+# WOUT
+#     def _get_model_column(self, attr, mapfunc=lambda x: x):
+#         raise Exception('WOUT: THIS IS DEPRECATED')
+#         col = self.rich_model.get_column_by_name(attr)
+#         if col is None:
+#             self._add_model_column(attr, add_sort=False)
+#             col = self.rich_model.get_column_by_name(attr)
+#         return col
 
     def get_col_type(self, datatype):
-
         if datatype == "string":
             return str
         elif datatype == "integer":
@@ -397,10 +415,18 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         else:
             return lambda x: x
 
-    def _add_model_column(self, attr, add_sort=True, mapfunc=lambda x: x):
+# WOUT: Deze hele methode en de attribuutdefinities moet worden opgeruimd.
+# WOUT
+#     def _add_model_column(self, attr, add_sort=True, mapfunc=lambda x: x):
+    def _add_model_column(self, attr, add_sort=True):
 
-        # get attribute definition from notebook
-        attr_def = self._notebook.attr_defs.get(attr)
+# WOUT
+#         # get attribute definition from notebook
+#         attr_def = self._notebook.attr_defs.get(attr)
+        attr_defs = AttrDefs()
+        for attr_def in g_default_attr_defs:
+            attr_defs.add(attr_def)
+        attr_def = attr_defs.get(attr)
 
         # get datatype
         if attr_def is not None:
@@ -410,10 +436,13 @@ class KeepNoteBaseTreeView (gtk.TreeView):
             datatype = "string"
             default = ""
 
-        # value fetching
-        get = lambda node: mapfunc(node.get_attr(attr, default))
+# WOUT
+#         # value fetching
+#         get = lambda node: mapfunc(node.get_attr(attr, default))
+        get = lambda node: mapfunc(getattr(node, attr, default))  # getattr() is the Python function
 
         # get coltype
+        mapfunc=lambda x: x
         mapfunc_sort = lambda x: x
         if datatype == "string":
             coltype = str
@@ -437,13 +466,11 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         if attr == self._attr_icon:
             coltype = gdk.Pixbuf
             coltype_sort = None
-            get = lambda node: get_node_icon(node, False,
-                                             node in self.rich_model.fades)
+            get = lambda node: get_node_icon(node, False, node in self.rich_model.fades)
         elif attr == self._attr_icon_open:
             coltype = gdk.Pixbuf
             coltype_sort = None
-            get = lambda node: get_node_icon(node, True,
-                                             node in self.rich_model.fades)
+            get = lambda node: get_node_icon(node, True, node in self.rich_model.fades)
 
         # get/make model column
         col = self.rich_model.get_column_by_name(attr)
@@ -456,10 +483,8 @@ class KeepNoteBaseTreeView (gtk.TreeView):
             attr_sort = attr + "_sort"
             col = self.rich_model.get_column_by_name(attr_sort)
             if col is None:
-                get_sort = lambda node: mapfunc_sort(
-                    node.get_attr(attr, default))
-                col = treemodel.TreeModelColumn(
-                    attr_sort, coltype_sort, attr=attr, get=get_sort)
+                get_sort = lambda node: mapfunc_sort(node.get_attr(attr, default))
+                col = treemodel.TreeModelColumn(attr_sort, coltype_sort, attr=attr, get=get_sort)
                 self.rich_model.append_column(col)
 
     def set_date_formats(self, formats):
@@ -494,15 +519,11 @@ class KeepNoteBaseTreeView (gtk.TreeView):
             if node == self._master_node:
                 for child in node.get_children():
                     if self.is_node_expanded(child):
-                        path = get_path_from_node(
-                            self.model, child,
-                            self.rich_model.get_node_column_pos())
+                        path = get_path_from_node(self.model, child, self.rich_model.get_node_column_pos())
                         self.expand_row(path, False)
             else:
                 try:
-                    path = get_path_from_node(
-                        self.model, node,
-                        self.rich_model.get_node_column_pos())
+                    path = get_path_from_node(self.model, node, self.rich_model.get_node_column_pos())
                 except:
                     path = None
                 if path is not None:
@@ -511,8 +532,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
                     # NOTE: parent may lose expand state if it has one child
                     # therefore, we should expand parent if it exists and is
                     # visible (i.e. len(path)>1) in treeview
-                    if (parent and self.is_node_expanded(parent) and
-                            len(path) > 1):
+                    if (parent and self.is_node_expanded(parent) and len(path) > 1):
                         self.expand_row(path[:-1], False)
 
                     if self.is_node_expanded(node):
@@ -550,11 +570,11 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
     def is_node_expanded(self, node):
         # query expansion from nodes
-        return node.get_attr("expanded", False)
+        return node.client_preferences.get("expanded", default=False)
 
     def set_node_expanded(self, node, expand):
         # save expansion in node
-        node.set_attr("expanded", expand)
+        node.client_preferences.set("expanded", expand)
 
         # TODO: do I notify listeners of expand change
         # Will this interfere with on_node_changed callbacks
@@ -601,8 +621,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
     def expand_node(self, node):
         """Expand a node in TreeView"""
-        path = get_path_from_node(self.model, node,
-                                  self.rich_model.get_node_column_pos())
+        path = get_path_from_node(self.model, node, self.rich_model.get_node_column_pos())
         if path is not None:
             self.expand_to_path(path)
 
@@ -626,8 +645,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         # NOTE: for now only select one node
         if len(nodes) > 0:
             node = nodes[0]
-            path = get_path_from_node(self.model, node,
-                                      self.rich_model.get_node_column_pos())
+            path = get_path_from_node(self.model, node, self.rich_model.get_node_column_pos())
             if path is not None:
                 if len(path) > 1:
                     self.expand_to_path(path[:-1])
@@ -659,8 +677,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
     def get_selected_iters(self):
         """Return a list of currently selected TreeIter's"""
         iters = []
-        self.get_selection().selected_foreach(lambda model, path, it:
-                                              iters.append(it))
+        self.get_selection().selected_foreach(lambda model, path, it: iters.append(it))
         return iters
 
     # TODO: add a reselect if node is deleted
@@ -669,8 +686,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
     #============================================
     # editing attr
 
-    def on_editing_started(self, cellrenderer, editable, path, attr,
-                           validator=TextRendererValidator()):
+    def on_editing_started(self, cellrenderer, editable, path, attr, validator=TextRendererValidator()):
         """Callback for start of title editing"""
         # remember editing state
         self.editing_path = path
@@ -691,8 +707,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         # remember editing state
         self.editing_path = None
 
-    def on_edit_attr(self, cellrenderertext, path, attr, new_text,
-                     validator=TextRendererValidator()):
+    def on_edit_attr(self, cellrenderertext, path, attr, new_text, validator=TextRendererValidator()):
         """Callback for completion of title editing"""
 
         # remember editing state
@@ -719,8 +734,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
 
         # reselect node
         # need to get path again because sorting may have changed
-        path = get_path_from_node(self.model, node,
-                                  self.rich_model.get_node_column_pos())
+        path = get_path_from_node(self.model, node, self.rich_model.get_node_column_pos())
         if path is not None:
             self.set_cursor(path)
             gobject.idle_add(lambda: self.scroll_to_cell(path))
@@ -741,9 +755,7 @@ class KeepNoteBaseTreeView (gtk.TreeView):
                        ("text/html", 0, -1),
                        ("text/plain", 0, -1)]
 
-            clipboard.set_with_data(targets, self._get_selection_data,
-                                    self._clear_selection_data,
-                                    nodes)
+            clipboard.set_with_data(targets, self._get_selection_data, self._clear_selection_data, nodes)
 
     def _on_copy_tree(self, widget):
 

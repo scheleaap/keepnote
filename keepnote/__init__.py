@@ -26,16 +26,18 @@
 
 
 # python imports
+import logging
 import os
 import shutil
 import sys
-import time
 import re
 import subprocess
+import time
 import tempfile
 import traceback
 import uuid
 import zipfile
+from keepnote.notebooknew.dao import Dao
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
@@ -58,8 +60,12 @@ from keepnote.notebook import \
     get_unique_filename_list
 import keepnote.notebook as notebooklib
 import keepnote.notebook.connection
-import keepnote.notebook.connection.fs
-import keepnote.notebook.connection.http
+# WOuT
+# import keepnote.notebook.connection.fs
+# import keepnote.notebook.connection.http
+import keepnote.notebooknew
+import keepnote.notebooknew.storage
+import keepnote.notebooknew.storage.fs
 from keepnote.pref import Pref
 import keepnote.timestamp
 import keepnote.trans
@@ -597,6 +603,7 @@ class KeepNotePreferences (Pref):
             self._pref_dir = pref_dir
 
         # listener
+# WOUT TODO: Replace with built-in
         self.changed = Listeners()
         #self.changed.add(self._on_changed)
 
@@ -707,7 +714,26 @@ class AppCommand (object):
         self.help = help
 
 
-class KeepNote (object):
+class OpenedNotebookInformation(object):
+    """Information about an opened notebook.
+    
+    @ivar location: The location of the notebook.
+    @ivar notebook: The opened Notebook.
+    @ivar notebook_storage: The NotebookStorage where the notebook is or should be stored.
+    @ivar dao: The Dao responsible for storage.
+    @ivar ref_count: A reference counter, defaults to 0.
+    """
+    
+    def __init__(self, location, notebook, notebook_storage, dao):
+        self.location = location
+        self.notebook = notebook
+        self.notebook_storage = notebook_storage
+        self.dao = dao
+        
+        self.ref_count = 0
+
+
+class Application(object):
     """KeepNote application class"""
 
     def __init__(self, basedir=None, pref_dir=None):
@@ -727,15 +753,12 @@ class KeepNote (object):
         self._commands = {}
 
         # list of opened notebooks
-        self._notebooks = {}
-        self._notebook_count = {}  # notebook ref counts
+        self._opened_notebook_information_by_notebook = {}
 
         # default protocols for notebooks
         self._conns = keepnote.notebook.connection.NoteBookConnections()
-        self._conns.add(
-            "file", keepnote.notebook.connection.fs.NoteBookConnectionFS)
-        self._conns.add(
-            "http", keepnote.notebook.connection.http.NoteBookConnectionHttp)
+        self._conns.add("file", keepnote.notebooknew.storage.fs.FileSystemStorage)
+        #self._conns.add("http", keepnote.notebook.connection.http.NoteBookConnectionHttp)
 
         # external apps
         self._external_apps = []
@@ -850,16 +873,32 @@ class KeepNote (object):
     #==================================
     # Notebooks
 
-    def open_notebook(self, filename, window=None, task=None):
-        """Open a new notebook"""
-
-        try:
-            conn = self._conns.get(filename)
-            notebook = notebooklib.NoteBook()
-            notebook.load(filename, conn)
-        except Exception:
-            return None
-        return notebook
+    def open_notebook(self, location):
+        """Opens and loads a new notebook.
+        
+        @param location: The location of the notebook to open.
+        @return: A new OpenedNotebookInformation.
+        """
+#        try:
+        notebook_storage = self._conns.get(location)
+        notebook = keepnote.notebooknew.Notebook(_("New Notebook"))
+        dao = keepnote.notebooknew.dao.Dao(
+                notebook,
+                notebook_storage,
+                [
+                        keepnote.notebooknew.dao.FolderNodeDao(),
+                        keepnote.notebooknew.dao.TrashNodeDao(),
+                        keepnote.notebooknew.dao.ContentNodeDao(),
+                ],
+                )
+        dao.sync()
+        opened_notebook_information = OpenedNotebookInformation(location, notebook, notebook_storage, dao)
+        
+        self._opened_notebook_information_by_notebook[notebook] = opened_notebook_information
+#        except Exception as e:
+#            logging.warn(e)
+#            return None
+        return opened_notebook_information
 
     def close_notebook(self, notebook):
         """Close notebook"""
@@ -876,7 +915,7 @@ class KeepNote (object):
             keepnote.log_error()
 
         notebook.closing_event.remove(self._on_closing_notebook)
-        del self._notebook_count[notebook]
+        del self._notebook_ref_count[notebook]
 
         for key, val in self._notebooks.iteritems():
             if val == notebook:
@@ -889,50 +928,62 @@ class KeepNote (object):
         """
         pass
 
-    def get_notebook(self, filename, window=None, task=None):
+    def _get_opened_notebook_information_by_location(self, location):
+        """Returns the OpenedNotebookInformation with a given location.
+        
+        @param location: The location to search for.
+        @return: An OpenedNotebookInformation object or None.
         """
-        Returns a an opened notebook referenced by filename
-
-        Open a new notebook if it is not already opened.
+        matches = [oni for oni in self._opened_notebook_information_by_notebook if oni.location == location]
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) == 0:
+            return None
+        else:
+            raise KeepNoteError('Two opened notebooks with the same location found')
+        
+        
+    def get_notebook(self, location, window=None, task=None):
+        """
+        Returns a an opened notebook referenced by location. Opens a new notebook if it is not already opened.
+        
+        @param location: The location of the notebook.
         """
 
         try:
-            filename = notebooklib.normalize_notebook_dirname(
-                filename, longpath=False)
-            filename = os.path.realpath(filename)
+            location = notebooklib.normalize_notebook_dirname(location, longpath=False)
+            location = os.path.realpath(location)
         except:
             pass
 
-        if filename not in self._notebooks:
-            notebook = self.open_notebook(filename, window, task=task)
-            if notebook is None:
+        opened_notebook_information = self._get_opened_notebook_information_by_location(location)
+        
+        # Open a new notebook if not open already
+        if opened_notebook_information is None:
+            opened_notebook_information = self.open_notebook(location, window, task=task)
+            if opened_notebook_information is None:
                 return None
 
             # perform bookkeeping
-            self._notebooks[filename] = notebook
-            notebook.closing_event.add(self._on_closing_notebook)
-            self.ref_notebook(notebook)
-        else:
-            notebook = self._notebooks[filename]
-            self.ref_notebook(notebook)
+            opened_notebook_information.notebook.closing_listeners.add(self._on_closing_notebook)
+
+        notebook = opened_notebook_information.notebook
+        self.ref_notebook(notebook)
 
         return notebook
 
     def ref_notebook(self, notebook):
-        if notebook not in self._notebook_count:
-            self._notebook_count[notebook] = 1
-        else:
-            self._notebook_count[notebook] += 1
+        self._opened_notebook_information_by_notebook[notebook].ref_count = +1
 
     def unref_notebook(self, notebook):
-        self._notebook_count[notebook] -= 1
+        self._opened_notebook_information_by_notebook[notebook].ref_count = -1
 
         # close if refcount is zero
-        if self._notebook_count[notebook] == 0:
+        if self._opened_notebook_information_by_notebook[notebook].ref_count == 0:
             self.close_all_notebook(notebook)
 
     def has_ref_notebook(self, notebook):
-        return notebook in self._notebook_count
+        return notebook in self._notebook_ref_count
 
     def iter_notebooks(self):
         """Iterate through open notebooks"""

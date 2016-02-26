@@ -110,7 +110,7 @@ class TextEditor (KeepNoteEditor):
 
     def set_notebook(self, notebook):
         """Set notebook for editor"""
-        # set new notebook
+        self.log.debug('Setting the notebook to {notebook}'.format(notebook=notebook))
         self._notebook = notebook
 
         if self._notebook:
@@ -199,7 +199,7 @@ class TextEditor (KeepNoteEditor):
                         manager = SourceLanguageManager()
                         #print manager.get_language_ids()
                         #lang = manager.get_language_from_mime_type(
-                        #    page.get_attr("content_type"))
+                        #    page.content_type)
                         lang = manager.get_language("python")
                         self._textview.get_buffer().set_language(lang)
 

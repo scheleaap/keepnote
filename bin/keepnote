@@ -20,6 +20,7 @@
 
 # python imports
 import exceptions
+import logging
 import sys
 import os
 from os.path import basename, dirname, realpath, join, isdir
@@ -154,6 +155,13 @@ o.add_option("-p", "--port", dest="port",
 def start_error_log(show_errors):
     """Starts KeepNote error log"""
 
+    #logging.basicConfig(format='%(asctime)s %(levelname)5s %(msg)s [%(pathname)s]', level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s %(levelname)5s %(msg)s [%(name)s]', level=logging.DEBUG)
+    logging.debug('Debug log message test')
+    logging.info('Info log message test')
+    logging.warn('Warning log message test')
+    logging.error('Error log message test')
+    
     keepnote.init_error_log()
         
     # Test ability to write to file-like objects used to display errors.  
@@ -267,7 +275,7 @@ def start_gui(argv, options, args, cmd_exec):
     setup_threading()
 
     # create app
-    app = keepnote.gui.KeepNote(basedir)
+    app = keepnote.gui.GuiApplication(basedir)
     app.init()
     cmd_exec.set_app(app)
     need_gui = execute_command(app, argv)
@@ -280,7 +288,7 @@ def start_gui(argv, options, args, cmd_exec):
 def start_non_gui(argv, options, args, cmd_exec):
 
     # read preferences
-    app = keepnote.KeepNote(basedir)
+    app = keepnote.Application(basedir)
     app.init()
     cmd_exec.set_app(app)
     execute_command(app, argv)

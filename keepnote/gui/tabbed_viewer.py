@@ -223,17 +223,32 @@ class TabbedViewer (Viewer):
     def on_tab_current_node(self, viewer, node):
         """Callback for when a viewer wants to set its title"""
 
+# WOUT
+#         # get node title
+#         if node is None:
+#             if viewer.get_notebook():
+#                 title = viewer.get_notebook().get_attr("title", "")
+#                 icon = None
+#             else:
+#                 title = _("(Untitled)")
+#                 icon = None
+#         else:
+#             title = node.get_attr("title", "")
+#             icon = get_node_icon(node, expand=False)
         # get node title
         if node is None:
             if viewer.get_notebook():
-                title = viewer.get_notebook().get_attr("title", "")
+                title = viewer.get_notebook().root.title
                 icon = None
             else:
-                title = _("(Untitled)")
+                title = None
                 icon = None
         else:
-            title = node.get_attr("title", "")
+            title = node.title
             icon = get_node_icon(node, expand=False)
+        
+        if title is None:
+            title = _("(Untitled)")
 
         # truncate title
         MAX_TITLE = 20
@@ -282,12 +297,13 @@ class TabbedViewer (Viewer):
 
     def set_notebook(self, notebook):
         """Set the notebook for the viewer"""
+        self.log.debug('Setting the notebook to {notebook} [TabbedViewer]'.format(notebook=notebook))
         if notebook is None:
             # clear the notebook in the viewer
             return self._current_viewer.set_notebook(notebook)
 
         # restore saved tabs
-        tabs = notebook.pref.get("viewers", "ids", self._viewerid,
+        tabs = notebook.client_preferences.get("viewers", "ids", self._viewerid,
                                  "tabs", default=[])
 
         if len(tabs) == 0:
@@ -324,7 +340,7 @@ class TabbedViewer (Viewer):
                 self._tabs.get_tab_label(viewer).set_text(name)
 
         # set tab focus
-        current_id = notebook.pref.get(
+        current_id = notebook.client_preferences.get(
             "viewers", "ids",  self._viewerid,
             "current_viewer", default="")
         for i, viewer in enumerate(self.iter_viewers()):
@@ -374,7 +390,7 @@ class TabbedViewer (Viewer):
 
         # clear tab info for all open notebooks
         for notebook in notebooks:
-            tabs = notebook.pref.get("viewers", "ids", self._viewerid, "tabs",
+            tabs = notebook.client_preferences.get("viewers", "ids", self._viewerid, "tabs",
                                      default=[])
             tabs[:] = []
 
@@ -384,7 +400,7 @@ class TabbedViewer (Viewer):
         for viewer in self.iter_viewers():
             notebook = viewer.get_notebook()
             if notebook:
-                tabs = notebook.pref.get(
+                tabs = notebook.client_preferences.get(
                     "viewers", "ids", self._viewerid, "tabs")
                 #node = viewer.get_current_node()
                 name = self._tab_names[viewer]
@@ -395,7 +411,7 @@ class TabbedViewer (Viewer):
 
                 # mark current viewer
                 if viewer == current_viewer:
-                    notebook.pref.set("viewers", "ids", self._viewerid,
+                    notebook.client_preferences.set("viewers", "ids", self._viewerid,
                                       "current_viewer", viewer.get_id())
 
     def undo(self):

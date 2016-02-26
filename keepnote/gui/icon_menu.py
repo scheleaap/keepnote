@@ -78,11 +78,12 @@ class IconMenu (gtk.Menu):
 
         self._notebook = notebook
 
-        if self._notebook is not None:
-            # listener to new notebook
-            self._notebook.pref.quick_pick_icons_changed.add(self.setup_menu)
-
-        self.setup_menu()
+# WOUT: Enable
+#         if self._notebook is not None:
+#             # listener to new notebook
+#             self._notebook.pref.quick_pick_icons_changed.add(self.setup_menu)
+# 
+#         self.setup_menu()
 
     def setup_menu(self):
         """Update menu to reflect notebook"""

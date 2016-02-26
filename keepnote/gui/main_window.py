@@ -25,6 +25,7 @@
 #
 
 # python imports
+import logging
 import os
 import shutil
 import sys
@@ -78,6 +79,7 @@ class KeepNoteWindow (gtk.Window):
 
     def __init__(self, app, winid=None):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
 
         self._app = app  # application object
         self._winid = winid if winid else unicode(uuid.uuid4())
@@ -583,7 +585,7 @@ class KeepNoteWindow (gtk.Window):
             # save window information for all notebooks associated with this
             # window
             for notebook in self.get_all_notebooks():
-                p = notebook.pref.get("windows", "ids", define=True)
+                p = notebook.client_preferences.get("windows", "ids", define=True)
                 p[self._winid] = {
                     "viewer_type": self.viewer.get_name(),
                     "viewerid": self.viewer.get_id()}
@@ -633,27 +635,6 @@ class KeepNoteWindow (gtk.Window):
 
         return self.open_notebook(filename, new=True)
 
-    def _load_notebook(self, filename):
-        """Loads notebook in background with progress bar"""
-        notebook = self._app.get_notebook(filename, self)
-        if notebook is None:
-            return None
-
-        # check for indexing
-        # TODO: is this the best place for checking?
-        # There is a difference between normal incremental indexing
-        # and indexing due version updating.
-        # incremental updating (checking a few files that have changed on
-        # disk) should be done within notebook.load().
-        # Whole notebook re-indexing, triggered by version upgrade
-        # should be done separately, and with a different wait dialog
-        # clearly indicating that notebook loading is going to take
-        # longer than usual.
-        if notebook.index_needed():
-            self.update_index(notebook)
-
-        return notebook
-
     def _restore_windows(self, notebook, open_here=True):
         """
         Restore multiple windows for notebook
@@ -676,9 +657,10 @@ class KeepNoteWindow (gtk.Window):
            saved ids.
 
         """
+        logging.debug('Restoring windows for notebook {}'.format(notebook))
+        
         # init window lookup
-        win_lookup = dict((w.get_id(), w) for w in
-                          self._app.get_windows())
+        win_lookup = dict((w.get_id(), w) for w in self._app.get_windows())
 
         def open_in_window(winid, viewerid, notebook):
             win = win_lookup.get(winid, None)
@@ -696,8 +678,8 @@ class KeepNoteWindow (gtk.Window):
 
         # find out how many windows this notebook had last time
         # init viewer if needed
-        windows = notebook.pref.get("windows", "ids", define=True)
-        notebook.pref.get("viewers", "ids", define=True)
+        windows = notebook.client_preferences.get("windows", "ids", define=True)
+        notebook.client_preferences.get("viewers", "ids", define=True)
 
         if len(windows) == 0:
             # no presistence info found, just open notebook in this window
@@ -720,16 +702,16 @@ class KeepNoteWindow (gtk.Window):
 
                     # notebooks are open, so reassign the notebook's pref to
                     # match the existing viewer
-                    notebook.pref.set(
+                    notebook.client_preferences.set(
                         "windows", "ids",
                         {self._winid:
                          {"viewerid": self.viewer.get_id(),
                           "viewer_type": self.viewer.get_name()}})
-                    notebook.pref.set(
+                    notebook.client_preferences.set(
                         "viewers", "ids", self.viewer.get_id(),
-                        notebook.pref.get("viewers", "ids", viewerid,
+                        notebook.client_preferences.get("viewers", "ids", viewerid,
                                           define=True))
-                    del notebook.pref.get("viewers", "ids")[viewerid]
+                    del notebook.client_preferences.get("viewers", "ids")[viewerid]
                     self.set_notebook(notebook)
                 else:
                     # open in whatever window the notebook wants
@@ -773,15 +755,29 @@ class KeepNoteWindow (gtk.Window):
         #    notebook = None
         #else:
 
-        notebook = self._load_notebook(filename)
+        notebook = self._app.get_notebook(filename, self)
         if notebook is None:
-            return
+            return None
+
+        # check for indexing
+        # TODO: is this the best place for checking?
+        # There is a difference between normal incremental indexing
+        # and indexing due version updating.
+        # incremental updating (checking a few files that have changed on
+        # disk) should be done within notebook.load().
+        # Whole notebook re-indexing, triggered by version upgrade
+        # should be done separately, and with a different wait dialog
+        # clearly indicating that notebook loading is going to take
+        # longer than usual.
+# WOUT: Enable and move to keepnote.__init__.py?
+#         if notebook.index_needed():
+#             self.update_index(notebook)
 
         # setup notebook
         self._restore_windows(notebook, open_here=open_here)
 
         if not new:
-            self.set_status(_("Loaded '%s'") % notebook.get_title())
+            self.set_status(_("Loaded '%s'") % notebook.title)
         self.update_title()
 
         # save notebook to recent notebooks
@@ -803,6 +799,7 @@ class KeepNoteWindow (gtk.Window):
 
     def set_notebook(self, notebook):
         """Set the NoteBook for the window"""
+        self.log.debug('Setting the notebook to {notebook}'.format(notebook=notebook))
         self.viewer.set_notebook(notebook)
 
     def update_index(self, notebook=None, clear=False):
@@ -857,18 +854,34 @@ class KeepNoteWindow (gtk.Window):
         if notebook is None:
             self.set_title(keepnote.PROGRAM_NAME)
         else:
-            title = notebook.get_attr("title", u"")
+            modified = notebook.is_dirty
+            modified_title = u'* ' if modified else u''
+            
+            notebook_title = notebook.root.title
+            if notebook_title is None:
+                notebook_title = _("(Untitled)")
+            
             if node is None:
                 node = self.get_current_node()
+            
             if node is not None:
-                title += u": " + node.get_attr("title", "")
-
-            modified = notebook.save_needed()
-            if modified:
-                self.set_title(u"* %s" % title)
-                self.set_status(_("Notebook modified"))
+                node_title = node.title
+                if node_title is None:
+                    node_title = _("(Untitled)")
+                title = '{modified}{notebook}: {node}'.format(
+                        modified=modified_title,
+                        notebook=notebook_title,
+                        node=node_title
+                        )
             else:
-                self.set_title(title)
+                title = '{modified}{notebook}'.format(
+                        modified=modified_title,
+                        notebook=notebook_title
+                        )
+
+            self.set_title(title)
+            if modified:
+                self.set_status(_("Notebook modified"))
 
     def _on_current_node(self, viewer, node):
         """Callback for when viewer changes the current node"""
@@ -896,7 +909,8 @@ class KeepNoteWindow (gtk.Window):
         # could make this a stand alone function/dialog box
 
         for node in nodes:
-            if node.get_attr("content_type") == notebooklib.CONTENT_TYPE_TRASH:
+# WOUT: TODO: Use node.can_delete()
+            if node.content_type == notebooklib.CONTENT_TYPE_TRASH:
                 self.error(_("The Trash folder cannot be deleted."), None)
                 return False
             if node.get_parent() is None:
@@ -904,13 +918,11 @@ class KeepNoteWindow (gtk.Window):
                 return False
 
         if len(nodes) > 1 or len(nodes[0].get_children()) > 0:
-            message = _(
-                "Do you want to delete this note and all of its children?")
+            message = _("Do you want to delete this note and all of its children?")
         else:
             message = _("Do you want to delete this note?")
 
-        return self._app.ask_yes_no(message, _("Delete Note"),
-                                    parent=self.get_toplevel())
+        return self._app.ask_yes_no(message, _("Delete Note"), parent=self.get_toplevel())
 
     def on_empty_trash(self):
         """Empty Trash folder in NoteBook"""

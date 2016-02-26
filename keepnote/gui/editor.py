@@ -24,6 +24,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 
+# python imports
+import logging
+
 # pygtk imports
 import pygtk
 pygtk.require('2.0')
@@ -44,6 +47,7 @@ class KeepNoteEditor (gtk.VBox):
 
     def __init__(self, app):
         gtk.VBox.__init__(self, False, 0)
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
         self._app = app
         self._notebook = None
         self._textview = None
@@ -51,6 +55,7 @@ class KeepNoteEditor (gtk.VBox):
 
     def set_notebook(self, notebook):
         """Set notebook for editor"""
+        pass
 
     def get_textview(self):
         return self._textview

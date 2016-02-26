@@ -25,6 +25,7 @@
 #
 
 # python imports
+import logging
 import os
 import sys
 import threading
@@ -38,7 +39,7 @@ import gobject
 
 # keepnote imports
 import keepnote
-from keepnote import log_error
+from keepnote import log_error, notebooknew
 import keepnote.gui.richtext.richtext_tags
 from keepnote import get_resource, unicode_gtk
 from keepnote import tasklib
@@ -49,6 +50,8 @@ import keepnote.gui.dialog_node_icon
 import keepnote.gui.dialog_wait
 from keepnote.gui.icons import \
     DEFAULT_QUICK_PICK_ICONS, uncache_node_icon
+
+import keepnote.notebooknew
 
 _ = keepnote.translate
 
@@ -391,11 +394,11 @@ def add_actions(actiongroup, actions):
 # requires listening for close.
 
 
-class KeepNote (keepnote.KeepNote):
+class GuiApplication(keepnote.Application):
     """GUI version of the KeepNote application instance"""
 
-    def __init__(self, basedir=None):
-        keepnote.KeepNote.__init__(self, basedir)
+    def __init__(self, *args, **kwargs):
+        super(GuiApplication, self).__init__(*args, **kwargs)
 
         # window management
         self._current_window = None
@@ -411,10 +414,6 @@ class KeepNote (keepnote.KeepNote):
         self._auto_save_registered = False  # True if autosave is registered
         self._auto_save_pause = 0           # >0 if autosave is paused
 
-    def init(self):
-        """Initialize application from disk"""
-        keepnote.KeepNote.init(self)
-
     def init_dialogs(self):
         self.app_options_dialog = (
             keepnote.gui.dialog_app_options.ApplicationOptionsDialog(self))
@@ -423,7 +422,7 @@ class KeepNote (keepnote.KeepNote):
 
     def set_lang(self):
         """Set language for application"""
-        keepnote.KeepNote.set_lang(self)
+        super(GuiApplication, self).set_lang()
 
         # setup glade with gettext
         import gtk.glade
@@ -436,7 +435,7 @@ class KeepNote (keepnote.KeepNote):
 
     def load_preferences(self):
         """Load information from preferences"""
-        keepnote.KeepNote.load_preferences(self)
+        super(GuiApplication, self).load_preferences()
 
         # set defaults for auto save
         p = self.pref
@@ -450,9 +449,10 @@ class KeepNote (keepnote.KeepNote):
         for window in self._windows:
             window.load_preferences()
 
-        for notebook in self._notebooks.itervalues():
-            notebook.enable_fulltext_search(p.get("use_fulltext_search",
-                                                  default=True))
+# WOUT
+#         for notebook in self._notebooks.itervalues():
+#             notebook.enable_fulltext_search(p.get("use_fulltext_search",
+#                                                   default=True))
 
         # start autosave loop, if requested
         self.begin_auto_save()
@@ -464,7 +464,7 @@ class KeepNote (keepnote.KeepNote):
         for window in self._windows:
             window.save_preferences()
 
-        keepnote.KeepNote.save_preferences(self)
+        super(GuiApplication, self).save_preferences()
 
     #=================================
     # GUI
@@ -498,28 +498,34 @@ class KeepNote (keepnote.KeepNote):
         """Returns a list of open windows"""
         return self._windows
 
-    def open_notebook(self, filename, window=None, task=None):
-        """Open notebook"""
+# WOUT: Hele methode
+    def open_notebook(self, location, window=None, task=None):
+        """Opens and loads a new notebook.
+        
+        @param location: The location of the notebook to open.
+        @return: A new OpenedNotebookInformation.
+        """
         from keepnote.gui import dialog_update_notebook
 
-        # HACK
-        if isinstance(self._conns.get(filename),
-                      keepnote.notebook.connection.fs.NoteBookConnectionFS):
-
-            try:
-                version = notebooklib.get_notebook_version(filename)
-            except Exception, e:
-                self.error(_("Could not load notebook '%s'.") % filename,
-                           e, sys.exc_info()[2])
-                return None
-
-            if version < notebooklib.NOTEBOOK_FORMAT_VERSION:
-                dialog = dialog_update_notebook.UpdateNoteBookDialog(
-                    self, window)
-                if not dialog.show(filename, version=version, task=task):
-                    self.error(_("Cannot open notebook (version too old)"))
-                    gtk.gdk.threads_leave()
-                    return None
+# WOUT
+#         # HACK
+#         if isinstance(self._conns.get(filename),
+#                       keepnote.notebook.connection.fs.NoteBookConnectionFS):
+# 
+#             try:
+#                 version = notebooklib.get_notebook_version(filename)
+#             except Exception, e:
+#                 self.display_error(_("Could not load notebook '%s'.") % filename,
+#                            e, sys.exc_info()[2])
+#                 return None
+# 
+#             if version < notebooklib.NOTEBOOK_FORMAT_VERSION:
+#                 dialog = dialog_update_notebook.UpdateNoteBookDialog(
+#                     self, window)
+#                 if not dialog.show(filename, version=version, task=task):
+#                     self.display_error(_("Cannot open notebook (version too old)"))
+#                     gtk.gdk.threads_leave()
+#                     return None
 
         # load notebook in background
         def update(task):
@@ -532,10 +538,8 @@ class KeepNote (keepnote.KeepNote):
             # simply do loading in the background thread.
             def func():
                 try:
-                    conn = self._conns.get(filename)
-                    notebook = notebooklib.NoteBook()
-                    notebook.load(filename, conn)
-                    task.set_result(notebook)
+                    result = super(GuiApplication, self).open_notebook(location)
+                    task.set_result(result)
                 except Exception:
                     task.set_exc_info()
                     task.stop()
@@ -547,10 +551,11 @@ class KeepNote (keepnote.KeepNote):
             # wait for notebook to load
             sem.acquire()
 
-        def update_old(task):
-            notebook = notebooklib.NoteBook()
-            notebook.load(filename)
-            task.set_result(notebook)
+# WOUT
+#         def update_old(task):
+#             notebook = notebooklib.NoteBook()
+#             notebook.load(filename)
+#             task.set_result(notebook)
 
         task = tasklib.Task(update)
         dialog = keepnote.gui.dialog_wait.WaitDialog(window)
@@ -561,34 +566,37 @@ class KeepNote (keepnote.KeepNote):
             if task.aborted():
                 raise task.exc_info()[1]
             else:
-                notebook = task.get_result()
-                if notebook is None:
+                result = task.get_result()
+                if result is None:
                     return None
 
-        except notebooklib.NoteBookVersionError, e:
-            self.error(_("This version of %s cannot read this notebook.\n"
-                         "The notebook has version %d.  %s can only read %d.")
-                       % (keepnote.PROGRAM_NAME,
-                          e.notebook_version,
-                          keepnote.PROGRAM_NAME,
-                          e.readable_version),
-                       e, task.exc_info()[2])
-            return None
-
-        except NoteBookError, e:
-            self.error(_("Could not load notebook '%s'.") % filename,
-                       e, task.exc_info()[2])
-            return None
+# WOUT: Move
+#         except notebooklib.NoteBookVersionError, e:
+#             self.display_error(_("This version of %s cannot read this notebook.\n"
+#                          "The notebook has version %d.  %s can only read %d.")
+#                        % (keepnote.PROGRAM_NAME,
+#                           e.notebook_version,
+#                           keepnote.PROGRAM_NAME,
+#                           e.readable_version),
+#                        e, task.exc_info()[2])
+#             return None
+# 
+#         except NoteBookError, e:
+#             self.display_error(_("Could not load notebook '%s'.") % filename,
+#                        e, task.exc_info()[2])
+#             return None
 
         except Exception, e:
             # give up opening notebook
-            self.error(_("Could not load notebook '%s'.") % filename,
-                       e, task.exc_info()[2])
+            msg = _("Could not load notebook '%s'.") % location
+            logging.warn(msg, exc_info=task.exc_info())
+            self.display_error(msg, e, task.exc_info()[2])
             return None
 
-        self._init_notebook(notebook)
+# WOUT: Enable
+#         self._init_notebook(notebook)
 
-        return notebook
+        return result
 
     def _init_notebook(self, notebook):
 
@@ -619,8 +627,8 @@ class KeepNote (keepnote.KeepNote):
 
         # clear all window and viewer info in notebooks
         for notebook in self._notebooks.itervalues():
-            notebook.pref.clear("windows", "ids")
-            notebook.pref.clear("viewers", "ids")
+            notebook.client_preferences.clear("windows", "ids")
+            notebook.client_preferences.clear("viewers", "ids")
 
         # save all the windows
         for window in self._windows:
@@ -638,7 +646,7 @@ class KeepNote (keepnote.KeepNote):
         """
         Callback for when notebook is about to close
         """
-        keepnote.KeepNote._on_closing_notebook(self, notebook, save)
+        super(GuiApplication, self)._on_closing_notebook(notebook, save)
 
         try:
             if save:
@@ -848,11 +856,11 @@ class KeepNote (keepnote.KeepNote):
 
         except Exception, e:
             if len(filenames) > 1:
-                self.error(_("Error while attaching files %s." %
+                self.display_error(_("Error while attaching files %s." %
                              ", ".join(["'%s'" % f for f in filenames])),
                            e, sys.exc_info()[2])
             else:
-                self.error(
+                self.display_error(
                     _("Error while attaching file '%s'." % filenames[0]),
                     e, sys.exc_info()[2])
 
@@ -864,7 +872,7 @@ class KeepNote (keepnote.KeepNote):
         for window in self._windows:
             window.restore_window()
 
-    def error(self, text, error=None, tracebk=None, parent=None):
+    def display_error(self, text, error=None, tracebk=None, parent=None):
         """Display an error message"""
 
         if parent is None:
@@ -921,7 +929,7 @@ class KeepNote (keepnote.KeepNote):
 
     def quit(self):
         """Quit the gtk event loop"""
-        keepnote.KeepNote.quit(self)
+        super(GuiApplication, self).quit()
 
         gtk.accel_map_save(get_accel_file())
         gtk.main_quit()
@@ -976,30 +984,24 @@ class KeepNote (keepnote.KeepNote):
 
     def install_extension(self, filename):
         """Install a new extension"""
-        if self.ask_yes_no(_("Do you want to install the extension \"%s\"?") %
-                           filename, "Extension Install"):
+        if self.ask_yes_no(_("Do you want to install the extension \"%s\"?") % filename, "Extension Install"):
             # install extension
-            new_exts = keepnote.KeepNote.install_extension(self, filename)
+            new_exts = super(GuiApplication, self).install_extension(filename)
 
             # initialize extensions with windows
             self.init_extensions_windows(exts=new_exts)
 
             if len(new_exts) > 0:
-                self.message(_("Extension \"%s\" is now installed.") %
-                             filename, _("Install Successful"))
+                self.message(_("Extension \"%s\" is now installed.") % filename, _("Install Successful"))
                 return True
 
         return False
 
     def uninstall_extension(self, ext_key):
         """Install a new extension"""
-        if self.ask_yes_no(
-                _("Do you want to uninstall the extension \"%s\"?") %
-                ext_key, _("Extension Uninstall")):
-            if keepnote.KeepNote.uninstall_extension(self, ext_key):
-                self.message(_("Extension \"%s\" is now uninstalled.") %
-                             ext_key,
-                             _("Uninstall Successful"))
+        if self.ask_yes_no(_("Do you want to uninstall the extension \"%s\"?") % ext_key, _("Extension Uninstall")):
+            if super(GuiApplication, self).uninstall_extension(ext_key):
+                self.message(_("Extension \"%s\" is now uninstalled.") % ext_key, _("Uninstall Successful"))
                 return True
 
         return False

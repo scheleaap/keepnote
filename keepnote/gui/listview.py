@@ -34,6 +34,7 @@ from keepnote.gui import basetreeview
 from keepnote.gui import treemodel
 import keepnote
 import keepnote.timestamp
+from keepnote.notebook import AttrDefs, g_default_attr_tables, g_default_attr_defs
 
 _ = keepnote.translate
 
@@ -42,7 +43,7 @@ DEFAULT_ATTR_COL_WIDTH = 150
 DEFAULT_TITLE_COL_WIDTH = 250
 
 
-class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
+class KeepNoteListView(basetreeview.KeepNoteBaseTreeView):
 
     def __init__(self):
         basetreeview.KeepNoteBaseTreeView.__init__(self)
@@ -87,9 +88,10 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
 
     def set_notebook(self, notebook):
         """Set the notebook for listview"""
+        self.log.debug('Setting the notebook to {notebook} [KeepNoteListView]'.format(notebook=notebook))
+        
         if notebook != self._notebook and self._notebook is not None:
-            self._notebook.get_listeners("table_changed").remove(
-                self._on_table_changed)
+            self._notebook.get_client_event_listeners("table_changed").remove(self._on_table_changed)
 
         basetreeview.KeepNoteBaseTreeView.set_notebook(self, notebook)
 
@@ -99,7 +101,7 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         if notebook:
             # load notebook prefs
             self.set_sensitive(True)
-            notebook.get_listeners("table_changed").add(self._on_table_changed)
+            notebook.get_client_event_listeners("table_changed").add(self._on_table_changed)
         else:
             self.set_sensitive(False)
 
@@ -117,20 +119,20 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
 
     def _save_column_widths(self):
         # save attr column widths
-        widths = self._notebook.get_attr("column_widths", {})
+        widths = self._notebook.client_preferences.get("column_widths", default={})
         for col in self.get_columns():
             widths[col.attr] = col.get_width()
-        self._notebook.set_attr("column_widths", widths)
+        self._notebook.client_preferences.set("column_widths", widths)
 
     def _save_column_order(self):
         # save column attrs
-        table = self._notebook.attr_tables.get(self._current_table)
+        table = self._notebook.client_preferences.get("attribute_table", default=g_default_attr_tables[0])
         table.attrs = [col.attr for col in self.get_columns()]
 
         # TODO: notify table change
 
     def _load_column_widths(self):
-        widths = self._notebook.get_attr("column_widths", {})
+        widths = self._notebook.client_preferences.get("column_widths", default={})
         for col in self.get_columns():
             width = widths.get(col.attr, DEFAULT_ATTR_COL_WIDTH)
             if col.get_width() != width and width > 0:
@@ -140,7 +142,9 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
     def _load_column_order(self):
         current_attrs = [col.attr for col in self.get_columns()]
 
-        table = self._notebook.attr_tables.get(self._current_table)
+# WOUT
+#         table = self._notebook.attr_tables.get(self._current_table)
+        table = self._notebook.client_preferences.get("attribute_table", default=g_default_attr_tables[0])
 
         if table.attrs != current_attrs:
             if set(current_attrs) == set(table.attrs):
@@ -168,15 +172,18 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         self.model.connect("sort-column-changed", self._sort_column_changed)
 
     def setup_columns(self):
-
+        self.log.debug('Setting up view columns')
         self.clear_columns()
 
         if self._notebook is None:
             self._columns_set = False
             return
 
-        # TODO: eventually columns may change when ever master node changes
-        attrs = self._notebook.attr_tables.get(self._current_table).attrs
+# WOUT
+#         # TODO: eventually columns may change when ever master node changes
+#         attrs = self._notebook.attr_tables.get(self._current_table).attrs
+        table = self._notebook.client_preferences.get("attribute_table", default=g_default_attr_tables[0])
+        attrs = table.attrs
 
         # add columns
         for attr in attrs:
@@ -199,17 +206,21 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         # TODO: load correct sorting right away
         # set default sorting
         # remember sort per node
-        self.model.set_sort_column_id(
-            self.rich_model.get_column_by_name("order").pos,
-            gtk.SORT_ASCENDING)
+        self.model.set_sort_column_id(self.rich_model.get_column_by_name("order").pos ,gtk.SORT_ASCENDING)
         self.set_reorder(basetreeview.REORDER_ALL)
 
         self._columns_set = True
 
     def _add_column(self, attr, cell_attr=None):
+        self.log.debug('Adding view column for attribute "{attr}" (cell_attr="{cell_attr}")'.format(attr=attr, cell_attr=cell_attr))
 
-        # get attribute definition from notebook
-        attr_def = self._notebook.attr_defs.get(attr)
+# WOUT
+#         # get attribute definition from notebook
+#         attr_def = self._notebook.attr_defs.get(attr)
+        attr_defs = AttrDefs()
+        for attr_def in g_default_attr_defs:
+            attr_defs.add(attr_def)
+        attr_def = attr_defs.get(attr)
 
         # get datatype
         if attr_def is not None:
@@ -229,9 +240,14 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         column.set_property("resizable", True)
         column.connect("notify::width", self._on_column_width_change)
         column.set_min_width(10)
+# WOUT
+#         column.set_fixed_width(
+#             self._notebook.get_attr("column_widths", {}).get(
+#                 attr, DEFAULT_ATTR_COL_WIDTH))
         column.set_fixed_width(
-            self._notebook.get_attr("column_widths", {}).get(
+            self._notebook.client_preferences.get("column_widths", default={}).get(
                 attr, DEFAULT_ATTR_COL_WIDTH))
+
         column.set_title(col_title)
 
         # define column sorting
@@ -245,12 +261,13 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
             self._add_title_render(column, attr)
         elif datatype == "timestamp":
             self._add_text_render(
-                column, attr, editable=True,
+                column,
+                attr,
+                editable=True,
                 validator=basetreeview.TextRendererValidator(
-                    lambda x: keepnote.timestamp.format_timestamp(
-                        x, self.time_edit_format),
-                    lambda x: keepnote.timestamp.parse_timestamp(
-                        x, self.time_edit_format)))
+                    lambda x: keepnote.timestamp.format_timestamp(x, self.time_edit_format),
+                    lambda x: keepnote.timestamp.parse_timestamp(x, self.time_edit_format))
+                    )
         else:
             self._add_text_render(column, attr)
 
@@ -262,7 +279,7 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
     # gui callbacks
 
     def is_node_expanded(self, node):
-        return node.get_attr("expanded2", False)
+        return node.client_preferences.get("expanded2", default=False)
 
     def set_node_expanded(self, node, expand):
 
@@ -270,7 +287,7 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         if len(treemodel.get_path_from_node(
                self.model, node,
                self.rich_model.get_node_column_pos())) > 1:
-            node.set_attr("expanded2", expand)
+            node.client_preferences.set("expanded2", expand)
 
     def _sort_column_changed(self, sortmodel):
         self._update_reorder()
@@ -350,7 +367,7 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
 
         if self._notebook:
             self._save_column_order()
-            self._notebook.get_listeners("table_changed").notify(
+            self._notebook.get_client_event_listeners("table_changed").notify(
                 self._notebook, self._current_table)
 
     def _on_column_width_change(self, col, width):
@@ -360,7 +377,7 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
                 self._col_widths.get(col.attr, None) != width):
             self._col_widths[col.attr] = width
             self._save_column_widths()
-            self._notebook.get_listeners("table_changed").notify(
+            self._notebook.get_client_event_listeners("table_changed").notify(
                 self._notebook, self._current_table)
 
     #====================================================
@@ -371,9 +388,10 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         #self.model.set_default_sort_func(None)
         #self.model.set_sort_column_id(-1, gtk.SORT_ASCENDING)
 
-        # save sorting if a single node was selected
-        if self._sel_nodes is not None and len(self._sel_nodes) == 1:
-            self.save_sorting(self._sel_nodes[0])
+# WOUT
+#         # save sorting if a single node was selected
+#         if self._sel_nodes is not None and len(self._sel_nodes) == 1:
+#             self.save_sorting(self._sel_nodes[0])
 
         if len(nodes) > 1:
             nested = False
@@ -388,9 +406,10 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         roots = nodes
         self.rich_model.set_root_nodes(roots)
 
-        # load sorting if single node is selected
-        if len(nodes) == 1:
-            self.load_sorting(nodes[0], self.model)
+# WOUT
+#         # load sorting if single node is selected
+#         if len(nodes) == 1:
+#             self.load_sorting(nodes[0], self.model)
 
         # expand rows
         for node in roots:
@@ -423,9 +442,8 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
 
         self.rich_model.append(node)
 
-        if node.get_attr("expanded2", False):
-            self.expand_to_path(treemodel.get_path_from_node(
-                self.model, node, self.rich_model.get_node_column_pos()))
+        if node.client_preferences.get("expanded2", default=False):
+            self.expand_to_path(treemodel.get_path_from_node(self.model, node, self.rich_model.get_node_column_pos()))
 
         self.set_sensitive(True)
 
@@ -447,22 +465,19 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
         def walk(node):
             npages = 1
             if (self.rich_model.get_nested() and
-                    (node.get_attr("expanded2", False))):
+                    (node.client_preferences.get("expanded2", default=False))):
                 for child in node.get_children():
                     npages += walk(child)
             return npages
 
-        return sum(walk(child) for node in roots
-                   for child in node.get_children())
+        return sum(walk(child) for node in roots for child in node.get_children())
 
     def edit_node(self, page):
-        path = treemodel.get_path_from_node(
-            self.model, page, self.rich_model.get_node_column_pos())
+        path = treemodel.get_path_from_node(self.model, page, self.rich_model.get_node_column_pos())
         if path is None:
             # view page first if not in view
             self.emit("goto-node", page)
-            path = treemodel.get_path_from_node(
-                self.model, page, self.rich_model.get_node_column_pos())
+            path = treemodel.get_path_from_node(self.model, page, self.rich_model.get_node_column_pos())
             assert path is not None
         self.set_cursor_on_cell(path, self.title_column, self.title_text, True)
         path, col = self.get_cursor()
@@ -493,8 +508,8 @@ class KeepNoteListView (basetreeview.KeepNoteBaseTreeView):
 
     def load_sorting(self, node, model):
         """Load sorting information from node"""
-        info_sort = node.get_attr("info_sort", "order")
-        sort_dir = node.get_attr("info_sort_dir", 1)
+        info_sort = node.client_preferences.get("info_sort", "order")
+        sort_dir = node.client_preferences.get("info_sort_dir", 1)
 
         if sort_dir:
             sort_dir = gtk.SORT_ASCENDING

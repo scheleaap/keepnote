@@ -26,6 +26,9 @@
 #
 
 
+# python imports
+import logging
+
 # pygtk imports
 import pygtk
 pygtk.require('2.0')
@@ -110,6 +113,8 @@ class BaseTreeModel (gtk.GenericTreeModel):
 
     def __init__(self, roots=[]):
         gtk.GenericTreeModel.__init__(self)
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
+        
         self.set_property("leak-references", False)
 
         self._notebook = None
@@ -124,8 +129,7 @@ class BaseTreeModel (gtk.GenericTreeModel):
         self.set_root_nodes(roots)
 
         # add default node column
-        self.append_column(TreeModelColumn("node", object,
-                                           get=lambda node: node))
+        self.append_column(TreeModelColumn("node", object, get=lambda node: node))
         self.set_node_column(self.get_column_by_name("node"))
 
     def set_notebook(self, notebook):
@@ -133,23 +137,30 @@ class BaseTreeModel (gtk.GenericTreeModel):
         Set the notebook for this model
         A notebook must be set before any nodes can be added to the model
         """
+        self.log.debug('Setting the notebook to {notebook} [BaseTreeModel]'.format(notebook=notebook))
 
         # unhook listeners for old notebook. if it exists
         if self._notebook is not None:
-            self._notebook.node_changed.remove(self._on_node_changed)
+            self._notebook.node_changed_listeners.remove(self._on_node_changed)
 
         self._notebook = notebook
 
         # attach new listeners for new notebook, if it exists
         if self._notebook:
-            self._notebook.node_changed.add(self._on_node_changed)
+            self._notebook.node_changed_listeners.add(self._on_node_changed)
 
     #==========================
     # column manipulation
 
     def append_column(self, column):
-        """Append a new column to the treemodel"""
-        assert column.name not in self._columns_lookup
+        """Append a new column to the treemodel.
+        
+        @raise ValueError: If the column already exists in the treemodel.
+        @return: The column.
+        """
+        self.log.debug('Appending column "{name}" to the treemodel'.format(name=column.name))
+        if column.name in self._columns_lookup:
+            raise ValueError('Column "{name}" already exists in the treemodel'.format(name=column.name))
 
         column.pos = len(self._columns)
         self._columns.append(column)
@@ -164,16 +175,8 @@ class BaseTreeModel (gtk.GenericTreeModel):
         return self._columns
 
     def get_column_by_name(self, colname):
-        """Returns a columns with the given name"""
+        """Returns a column with the given name"""
         return self._columns_lookup.get(colname, None)
-
-    def add_column(self, name, coltype, get):
-        """Append column only if it does not already exist"""
-        col = self.get_column_by_name(name)
-        if col is None:
-            col = TreeModelColumn(name, coltype, get=get)
-            self.append_column(col)
-        return col
 
     def get_node_column_pos(self):
         """Returns the column position containing node objects"""
@@ -357,8 +360,13 @@ class BaseTreeModel (gtk.GenericTreeModel):
         path = []
         node = rowref
         while node not in self._root_set:
-            path.append(node.get_attr("order"))
-            node = node.get_parent()
+# WOUT
+#            path.append(node.get_attr("order"))
+            children = node.parent.get_children()
+            order = children.index(rowref)
+            path.append(order)
+
+            node = node.parent
             if node is None:
                 raise Exception("treeiter is not part of model")
         path.append(self._root_set[node])
@@ -371,7 +379,7 @@ class BaseTreeModel (gtk.GenericTreeModel):
 
     def on_iter_next(self, rowref):
         """Returns the next sibling of a rowref"""
-        parent = rowref.get_parent()
+        parent = rowref.parent
 
         if parent is None or rowref in self._root_set:
             n = self._root_set[rowref]
@@ -381,8 +389,10 @@ class BaseTreeModel (gtk.GenericTreeModel):
                 return self._roots[n+1]
 
         children = parent.get_children()
-        order = rowref.get_attr("order")
-        assert 0 <= order < len(children)
+# WOUT
+#        order = rowref.order
+#        assert 0 <= order < len(children)
+        order = children.index(rowref)
 
         if order == len(children) - 1:
             return None
@@ -436,8 +446,7 @@ class BaseTreeModel (gtk.GenericTreeModel):
         if child in self._root_set:
             return None
         else:
-            parent = child.get_parent()
-            return parent
+            return child.parent
 
 
 gobject.type_register(BaseTreeModel)

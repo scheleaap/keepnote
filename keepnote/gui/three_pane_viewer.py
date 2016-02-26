@@ -114,7 +114,7 @@ class ThreePaneViewer (Viewer):
         #self.editor = RichTextEditor(self._app)
         self.editor = ContentEditor(self._app)
         rich_editor = RichTextEditor(self._app)
-        self.editor.add_editor("text/xhtml+xml", rich_editor)
+        self.editor.add_editor("text/html", rich_editor)
         self.editor.add_editor("text", TextEditor(self._app))
         self.editor.set_default_editor(rich_editor)
 
@@ -167,19 +167,20 @@ class ThreePaneViewer (Viewer):
 
     def set_notebook(self, notebook):
         """Set the notebook for the viewer"""
+        self.log.debug('Setting the notebook to {notebook} [TreePaneViewer]'.format(notebook=notebook))
         # add/remove reference to notebook
-        self._app.ref_notebook(notebook)
+        if notebook is not None:
+            self._app.ref_notebook(notebook)
         if self._notebook is not None:
             self._app.unref_notebook(self._notebook)
 
         # deregister last notebook, if it exists
         if self._notebook:
-            self._notebook.node_changed.remove(
-                self.on_notebook_node_changed)
+            self._notebook.node_changed_listeners.remove(self.on_notebook_node_changed)
 
         # setup listeners
         if notebook:
-            notebook.node_changed.add(self.on_notebook_node_changed)
+            notebook.node_changed_listeners.add(self.on_notebook_node_changed)
 
         # set notebook
         self._notebook = notebook
@@ -191,7 +192,7 @@ class ThreePaneViewer (Viewer):
             self.treeview.get_popup_menu().iconmenu.set_notebook(notebook)
             self.listview.get_popup_menu().iconmenu.set_notebook(notebook)
 
-            colors = (self._notebook.pref.get("colors", default=DEFAULT_COLORS)
+            colors = (self._notebook.client_preferences.get("colors", default=DEFAULT_COLORS)
                       if self._notebook else DEFAULT_COLORS)
             self.treeview.get_popup_menu().fgcolor_menu.set_colors(colors)
             self.treeview.get_popup_menu().bgcolor_menu.set_colors(colors)
@@ -304,7 +305,7 @@ class ThreePaneViewer (Viewer):
     def _load_selections(self):
         """Load previous node selections from notebook preferences"""
         if self._notebook:
-            info = self._notebook.pref.get("viewers", "ids",
+            info = self._notebook.client_preferences.get("viewers", "ids",
                                            self._viewerid, define=True)
 
             # load selections
@@ -323,7 +324,7 @@ class ThreePaneViewer (Viewer):
     def _save_selections(self):
         """Save node selections into notebook preferences"""
         if self._notebook is not None:
-            info = self._notebook.pref.get("viewers", "ids",
+            info = self._notebook.client_preferences.get("viewers", "ids",
                                            self._viewerid, define=True)
 
             # save selections
@@ -490,7 +491,7 @@ class ThreePaneViewer (Viewer):
         if self._new_page_occurred:
             self._new_page_occurred = False
 
-            if node.get_attr("content_type") != notebooklib.CONTENT_TYPE_DIR:
+            if node.content_type != notebooklib.CONTENT_TYPE_DIR:
                 self.goto_editor()
 
     def _on_attach_file(self, widget, parent, index, uri):
@@ -822,7 +823,7 @@ class ThreePaneViewer (Viewer):
 
         def on_set_colors(w, colors):
             if self._notebook:
-                self._notebook.pref.set("colors", list(colors))
+                self._notebook.client_preferences.set("colors", list(colors))
                 self._app.get_listeners("colors_changed").notify(
                     self._notebook, colors)
 
@@ -830,7 +831,7 @@ class ThreePaneViewer (Viewer):
             if self._notebook == notebook:
                 menu.set_colors(colors)
 
-        colors = self._notebook.pref.get("colors", default=DEFAULT_COLORS) \
+        colors = self._notebook.client_preferences.get("colors", default=DEFAULT_COLORS) \
             if self._notebook else DEFAULT_COLORS
 
         menu = ColorMenu(colors)

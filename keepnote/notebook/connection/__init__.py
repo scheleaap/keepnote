@@ -372,7 +372,7 @@ class NoteBookConnections (object):
         proto = self.get_proto(url)
         conn_class = self._protos.get(proto, None)
         if conn_class:
-            return conn_class()
+            return conn_class(url)
         else:
             # fallback to 'file' protocol
             return self._protos.get("file", None)

@@ -398,7 +398,7 @@ class AttrDef (object):
     An AttrDef defines the type of an notebook attr
     """
 
-    def __init__(self, key, datatype, name, default=None):
+    def __init__(self, key, datatype, name=None, default=None):
         self.key = key
         self.datatype = datatype
         self.name = name
@@ -911,6 +911,7 @@ class NoteBookNode (object):
     def duplicate(self, parent, index=None, recurse=False, notify=True,
                   skip=None):
         """Duplicate a node to a new parent"""
+# WOUT TODO
 
         # NOTE: we must be able to handle the case where the root node is
         # duplicated.
@@ -1460,23 +1461,18 @@ class NoteBook (NoteBookNode):
         # ensure trash directory exists
         self._trash = None
         for child in self.get_children():
-            if self.is_trash_dir(child):
+            if child.is_trash:
                 self._trash = child
                 break
 
         # if no trash folder, create it
         if self._trash is None:
             try:
-                self._trash = self.new_node(CONTENT_TYPE_TRASH, self,
-                                            {"title": TRASH_NAME})
+                self._trash = self.new_node(CONTENT_TYPE_TRASH, self, {"title": TRASH_NAME})
                 self._add_child(self._trash)
 
             except NoteBookError, e:
                 raise NoteBookError(_("Cannot create Trash folder"), e)
-
-    def is_trash_dir(self, node):
-        """Returns True if node is a Trash Folder"""
-        return node.get_attr("content_type") == CONTENT_TYPE_TRASH
 
     def empty_trash(self):
         """Deletes all nodes under Trash Folder"""
@@ -1497,8 +1493,7 @@ class NoteBook (NoteBookNode):
 
         # TODO: is there a better way to access icons?
         # directly by stream?
-        filename = connection.path_join(
-            NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR, basename)
+        filename = connection.path_join(NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR, basename)
         if self._conn.has_file(self._attr["nodeid"], filename):
             return self._conn.get_file(self._attr["nodeid"], filename)
         else:
@@ -1506,8 +1501,7 @@ class NoteBook (NoteBookNode):
 
     def get_icons(self):
         """Returns list of icons in notebook icon store"""
-        filename = connection.path_join(
-            NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR) + '/'
+        filename = connection.path_join(NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR) + '/'
         filenames = list(self._conn.list_dir(self._attr["nodeid"], filename))
         filenames.sort()
         return filenames
@@ -1519,15 +1513,13 @@ class NoteBook (NoteBookNode):
 
         basename = os.path.basename(filename)
         basename, ext = os.path.splitext(basename)
-        newfilename = connection.path_join(
-            NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR, basename)
+        newfilename = connection.path_join(NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR, basename)
 
         newfilename = connection_fs.new_filename(
             self._conn, self._attr["nodeid"], newfilename, ext, u"-",
             ensure_valid=False)
 
-        self._conn.copy_file(None, filename,
-                             self._attr["nodeid"], newfilename)
+        self._conn.copy_file(None, filename, self._attr["nodeid"], newfilename)
         return connection.path_basename(newfilename)
 
     def install_icons(self, filename, filename_open):
@@ -1537,8 +1529,7 @@ class NoteBook (NoteBookNode):
 
         basename = os.path.basename(filename)
         basename, ext = os.path.splitext(basename)
-        startname = connection.path_join(NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR,
-                                         basename)
+        startname = connection.path_join(NOTEBOOK_META_DIR, NOTEBOOK_ICON_DIR, basename)
 
         number = 2
         use_number = False

@@ -93,7 +93,7 @@ class TextEditor (KeepNoteEditor):
 
     def set_notebook(self, notebook):
         """Set notebook for editor"""
-        # set new notebook
+        self.log.debug('Setting the notebook to {notebook}'.format(notebook=notebook))
         self._notebook = notebook
 
         if self._notebook:

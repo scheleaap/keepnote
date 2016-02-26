@@ -25,6 +25,7 @@
 #
 
 # python imports
+import logging
 import uuid
 
 # pygtk imports
@@ -45,6 +46,7 @@ class Viewer (gtk.VBox):
 
     def __init__(self, app, parent, viewerid=None, viewer_name="viewer"):
         gtk.VBox.__init__(self, False, 0)
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
         self._app = app
         self._main_window = parent
         self._viewerid = viewerid if viewerid else unicode(uuid.uuid4())
@@ -67,6 +69,7 @@ class Viewer (gtk.VBox):
 
     def set_notebook(self, notebook):
         """Sets the current notebook for the viewer"""
+        self.log.debug('Setting the notebook to {notebook} [Viewer]'.format(notebook=notebook))
         self._notebook = notebook
 
     def get_notebook(self):
