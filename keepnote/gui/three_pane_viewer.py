@@ -83,28 +83,25 @@ class ThreePaneViewer (Viewer):
         # widgets
 
         # treeview
-        self.treeview = KeepNoteTreeView()
+        self.treeview = KeepNoteTreeView(self._app)
         self.treeview.set_get_node(self._app.get_node)
         self.treeview.connect("select-nodes", self._on_tree_select)
         self.treeview.connect("delete-node", self.on_delete_node)
-        self.treeview.connect("error", lambda w, t, e:
-                              self.emit("error", t, e))
+        self.treeview.connect("error", lambda w, t, e: self.emit("error", t, e))
         self.treeview.connect("edit-node", self._on_edit_node)
         self.treeview.connect("goto-node", self.on_goto_node)
         self.treeview.connect("activate-node", self.on_activate_node)
         self.treeview.connect("drop-file", self._on_attach_file)
 
         # listview
-        self.listview = KeepNoteListView()
+        self.listview = KeepNoteListView(self._app)
         self.listview.set_get_node(self._app.get_node)
         self.listview.connect("select-nodes", self._on_list_select)
         self.listview.connect("delete-node", self.on_delete_node)
         self.listview.connect("goto-node", self.on_goto_node)
         self.listview.connect("activate-node", self.on_activate_node)
-        self.listview.connect("goto-parent-node",
-                              lambda w: self.on_goto_parent_node())
-        self.listview.connect("error", lambda w, t, e:
-                              self.emit("error", t, e))
+        self.listview.connect("goto-parent-node", lambda w: self.on_goto_parent_node())
+        self.listview.connect("error", lambda w, t, e: self.emit("error", t, e))
         self.listview.connect("edit-node", self._on_edit_node)
         self.listview.connect("drop-file", self._on_attach_file)
         self.listview.on_status = self.set_status  # TODO: clean up
@@ -407,7 +404,7 @@ class ThreePaneViewer (Viewer):
     def _on_editor_view_node(self, editor, node):
         """Callback for when editor views a node"""
         # record node in history
-        self._history.add(node.get_attr("nodeid"))
+        self._history.add(node.node_id)
         self.emit("history-changed", self._history)
 
     def _on_child_activated(self, editor, textview, child):

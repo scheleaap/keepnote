@@ -105,13 +105,14 @@ class TextRendererValidator (object):
         self.parse = parse2
 
 
-class KeepNoteBaseTreeView (gtk.TreeView):
+class KeepNoteBaseTreeView(gtk.TreeView):
     """Base class for treeviews of a NoteBook notes"""
 
-    def __init__(self):
-        gtk.TreeView.__init__(self)
+    def __init__(self, app, *args, **kwargs):
+        super(KeepNoteBaseTreeView, self).__init__(*args, **kwargs)
         self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
 
+        self._app = app
         self.model = None
         self.rich_model = None
         self._notebook = None
@@ -167,12 +168,8 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         self.connect("drag-data-received", self._on_drag_data_received)
 
         # configure drag and drop events
-        self.enable_model_drag_source(
-            gtk.gdk.BUTTON1_MASK, [DROP_TREE_MOVE], gtk.gdk.ACTION_MOVE)
-        self.drag_source_set(
-            gtk.gdk.BUTTON1_MASK,
-            [DROP_TREE_MOVE],
-            gtk.gdk.ACTION_MOVE)
+        self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [DROP_TREE_MOVE], gtk.gdk.ACTION_MOVE)
+        self.drag_source_set(gtk.gdk.BUTTON1_MASK, [DROP_TREE_MOVE], gtk.gdk.ACTION_MOVE)
         self.enable_model_drag_dest([DROP_TREE_MOVE, DROP_URI],
                                     gtk.gdk.ACTION_MOVE |
                                     gtk.gdk.ACTION_COPY |
@@ -836,15 +833,12 @@ class KeepNoteBaseTreeView (gtk.TreeView):
         elif "text/html" in selection_data.target:
             # set html
             selection_data.set("text/html", 8,
-                               " ".join(["<a href='%s'>%s</a>" %
-                                         (node.get_url(),
-                                          node.get_title())
+                               " ".join(["<a href='%s'>%s</a>" % (node.get_url(), node.get_title())
                                          for node in nodes]))
 
         else:
             # set plain text
-            selection_data.set_text(" ".join([node.get_url()
-                                              for node in nodes]))
+            selection_data.set_text(" ".join([self._app.get_node_url(node) for node in nodes]))
 
     def _do_paste_nodes(self, clipboard, selection_data, data):
         """Paste nodes into treeview"""

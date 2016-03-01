@@ -40,7 +40,7 @@ from keepnote.notebook import \
     is_node_url
 from keepnote.gui.richtext import \
     RichTextView, RichTextBuffer, \
-    RichTextIO, RichTextError
+    RichTextError
 from keepnote.gui import \
     CONTEXT_MENU_ACCEL_PATH, \
     Action, \
@@ -64,7 +64,6 @@ class TextEditor (KeepNoteEditor):
         self._page = None                  # current NoteBookPage
         self._page_scrolls = {}            # remember scroll in each page
         self._page_cursors = {}
-        self._textview_io = RichTextIO()
 
         # textview and its callbacks
         self._textview = RichTextView(RichTextBuffer(
@@ -264,10 +263,11 @@ class TextEditor (KeepNoteEditor):
         """Callback for textview modification"""
         self.emit("modified", self._page, modified)
 
-        # make notebook node modified
-        if modified:
-            self._page.mark_modified()
-            self._page.notify_change(False)
+# WOUT
+#         # make notebook node modified
+#         if modified:
+#             self._page.mark_modified()
+#             self._page.notify_change(False)
 
     def _on_visit_url(self, textview, url):
         """Callback for textview visiting a URL"""

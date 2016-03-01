@@ -45,8 +45,8 @@ DEFAULT_TITLE_COL_WIDTH = 250
 
 class KeepNoteListView(basetreeview.KeepNoteBaseTreeView):
 
-    def __init__(self):
-        basetreeview.KeepNoteBaseTreeView.__init__(self)
+    def __init__(self, *args, **kwargs):
+        super(KeepNoteListView, self).__init__(*args, **kwargs)
         self._sel_nodes = None
         self._columns_set = False
         self._current_table = "default"

@@ -455,6 +455,7 @@ def init_error_log(pref_dir=None, home=None):
         open(error_log, "a").close()
 
 
+# WOUT: DEPRECATED
 def log_error(error=None, tracebk=None, out=None):
     """Write an exception error to the error log"""
 
@@ -737,6 +738,7 @@ class Application(object):
     """KeepNote application class"""
 
     def __init__(self, basedir=None, pref_dir=None):
+        self.log = logging.getLogger('{module}.{cls}.{id}'.format(module=__name__, cls=self.__class__.__name__, id=id(self)))
 
         # base directory of keepnote library
         if basedir is not None:
@@ -845,9 +847,12 @@ class Application(object):
 
     def error(self, text, error=None, tracebk=None):
         """Display an error message"""
-        keepnote.log_message(text)
-        if error is not None:
-            keepnote.log_error(error, tracebk)
+        if type(error) == tuple:
+            self.log.error(text, exc_info=error)
+        else:
+            keepnote.log_message(text)
+            if error is not None:
+                keepnote.log_error(error, tracebk)
 
     def quit(self):
         """Stop the application"""
@@ -879,7 +884,6 @@ class Application(object):
         @param location: The location of the notebook to open.
         @return: A new OpenedNotebookInformation.
         """
-#        try:
         notebook_storage = self._conns.get(location)
         notebook = keepnote.notebooknew.Notebook(_("New Notebook"))
         dao = keepnote.notebooknew.dao.Dao(
@@ -895,9 +899,6 @@ class Application(object):
         opened_notebook_information = OpenedNotebookInformation(location, notebook, notebook_storage, dao)
         
         self._opened_notebook_information_by_notebook[notebook] = opened_notebook_information
-#        except Exception as e:
-#            logging.warn(e)
-#            return None
         return opened_notebook_information
 
     def close_notebook(self, notebook):
@@ -942,7 +943,7 @@ class Application(object):
         else:
             raise KeepNoteError('Two opened notebooks with the same location found')
         
-        
+# WOUT: DEPRECATE
     def get_notebook(self, location, window=None, task=None):
         """
         Returns a an opened notebook referenced by location. Opens a new notebook if it is not already opened.
@@ -1450,6 +1451,14 @@ class Application(object):
         """Get the data directory of an extension"""
         return os.path.join(
             get_user_extensions_data_dir(self.get_pref_dir()), extkey)
+    
+    # WOUT: TODO: Get URL from Dao
+    def get_node_url(self, node):
+        """Get URL for a node"""
+        notebook = node.notebook
+        location = self._opened_notebook_information_by_notebook[notebook].location
+        
+        return u"nbk://%s/%s" % (location, node.node_id)
 
 
 def unzip(filename, outdir):

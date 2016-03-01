@@ -39,8 +39,8 @@ class KeepNoteTreeView (basetreeview.KeepNoteBaseTreeView):
     TreeView widget for the KeepNote NoteBook
     """
 
-    def __init__(self):
-        basetreeview.KeepNoteBaseTreeView.__init__(self)
+    def __init__(self, *args, **kwargs):
+        super(KeepNoteTreeView, self).__init__(*args, **kwargs)
 
         self._notebook = None
 

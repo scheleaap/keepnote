@@ -77,8 +77,7 @@ class TabbedViewer (Viewer):
         # TODO: move to the app?
         # viewer registry
         self._viewer_lookup = TwoWayDict()
-        self._viewer_lookup.add(ThreePaneViewer(app, main_window).get_name(),
-                                ThreePaneViewer)
+        self._viewer_lookup.add(ThreePaneViewer(app, main_window).get_name(), ThreePaneViewer)
 
         # layout
         self._tabs = gtk.Notebook()
@@ -129,10 +128,8 @@ class TabbedViewer (Viewer):
         # setup viewer signals
         self._callbacks[viewer] = [
             viewer.connect("error", lambda w, m, e: self.emit("error", m, e)),
-            viewer.connect("status", lambda w, m, b:
-                           self.emit("status", m, b)),
-            viewer.connect("window-request", lambda w, t:
-                           self.emit("window-request", t)),
+            viewer.connect("status", lambda w, m, b: self.emit("status", m, b)),
+            viewer.connect("window-request", lambda w, t: self.emit("window-request", t)),
             viewer.connect("current-node", self.on_tab_current_node),
             viewer.connect("modified", self.on_tab_modified)]
 

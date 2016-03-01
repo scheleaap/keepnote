@@ -311,10 +311,11 @@ class TextEditor (KeepNoteEditor):
         """Callback for textview modification"""
         self.emit("modified", self._page, modified)
 
-        # make notebook node modified
-        if modified:
-            self._page.mark_modified()
-            self._page.notify_change(False)
+# WOUT
+#         # make notebook node modified
+#         if modified:
+#             self._page.mark_modified()
+#             self._page.notify_change(False)
 
     def _on_visit_url(self, textview, url):
         """Callback for textview visiting a URL"""
