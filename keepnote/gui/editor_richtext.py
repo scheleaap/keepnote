@@ -25,8 +25,10 @@
 #
 
 # python imports
+import io
 import os
 import re
+import sys
 
 # pygtk imports
 import pygtk
@@ -44,11 +46,10 @@ from keepnote.notebook import \
     get_node_url, \
     parse_node_url, \
     is_node_url
-from keepnote import notebook as notebooklib
 from keepnote.gui import dialog_image_new
 from keepnote.gui.richtext import \
     RichTextView, RichTextBuffer, \
-    RichTextIO, RichTextError, RichTextImage
+    RichTextError, RichTextImage
 from keepnote.gui.richtext.richtext_tags import RichTextLinkTag
 from keepnote.gui.icons import lookup_icon_filename
 from keepnote.gui.font_selector import FontSelector
@@ -69,6 +70,19 @@ from keepnote.gui import \
     dialog_find, \
     dialog_image_resize
 
+# richtext io
+from richtext.richtext_html import HtmlBuffer, HtmlError
+
+# textbuffer_tools imports
+from richtext.textbuffer_tools import \
+    iter_buffer_contents, iter_buffer_anchors
+
+# richtextbuffer imports
+from richtext.richtextbuffer import \
+    ignore_tag
+
+import keepnote.notebooknew
+
 
 _ = keepnote.translate
 
@@ -83,11 +97,10 @@ def is_local_file(filename):
     return filename and ("/" not in filename) and ("\\" not in filename)
 
 
-class NodeIO (RichTextIO):
+class NewRichTextIO(object):
     """Read/Writes the contents of a RichTextBuffer to disk"""
-
     def __init__(self):
-        RichTextIO.__init__(self)
+        self._html_buffer = HtmlBuffer()
         self._node = None
         self._image_files = set()
         self._saved_image_files = set()
@@ -95,67 +108,150 @@ class NodeIO (RichTextIO):
     def set_node(self, node):
         self._node = node
 
-    def save(self, textbuffer, filename, title=None, stream=None):
-        """Save buffer contents to file"""
-        RichTextIO.save(self, textbuffer, filename, title, stream=stream)
+    def save(self, textbuffer):
+        """Save buffer contents to a node.
 
-    def load(self, textview, textbuffer, filename, stream=None):
-        RichTextIO.load(self, textview, textbuffer, filename, stream=stream)
+        @param textbuffer: richtextbuffer to save
+        """
+        self._save_images(textbuffer)
 
-    def _load_images(self, textbuffer, html_filename):
+        outfile = None
+        try:
+            buffer_contents = iter_buffer_contents(textbuffer, None, None, ignore_tag)
+
+            # Capture the HTML as unicode text.
+            outfile = io.StringIO()
+            self._html_buffer.set_output(outfile)
+            self._html_buffer.write(buffer_contents, textbuffer.tag_table, title=self._node.title)
+            text = outfile.getvalue()
+            outfile.close()
+            
+            # Write the HTML as an UTF-8 encoded string. 
+            outfile = self._node.get_payload(self._node.main_payload_name).open('w')
+            outfile.write(text.encode('utf-8'))
+        except IOError, e:
+            raise RichTextError('Could not save node {node_id}'.format(node_id=self._node.node_id), e)
+        finally:
+            if outfile is not None:
+                outfile.close()
+
+        textbuffer.set_modified(False)
+
+    def load(self, textview, textbuffer):
+        """Load buffer with data from file
+
+        @param textview: ...
+        @param textbuffer: richtextbuffer to load
+        """
+        # unhook expensive callbacks
+        textbuffer.block_signals()
+        if textview:
+            spell = textview.is_spell_check_enabled()
+            textview.enable_spell_check(False)
+            textview.set_buffer(None)
+
+        # clear buffer
+        textbuffer.clear()
+
+        temp_exception = None
+        infile = None
+        try:
+            # Read the HTML as an UTF-8 encoded string.
+            infile = self._node.get_payload(self._node.main_payload_name).open('r')
+            text = infile.read().decode('utf-8')
+            infile.close()
+            
+            # Read the HTML as unicode text.
+            infile = io.StringIO(text)
+            buffer_contents = self._html_buffer.read(infile)
+            textbuffer.insert_contents(buffer_contents, textbuffer.get_start_iter())
+
+            # put cursor at begining
+            textbuffer.place_cursor(textbuffer.get_start_iter())
+
+        except (HtmlError, IOError, Exception), e:
+            temp_exception = e
+            textbuffer.clear()
+            if textview:
+                textview.set_buffer(textbuffer)
+        else:
+            # finish loading
+            self._load_images(textbuffer)
+            if textview:
+                textview.set_buffer(textbuffer)
+                textview.show_all()
+        finally:
+            if infile is not None:
+                infile.close()
+
+        # rehook up callbacks
+        textbuffer.unblock_signals()
+        if textview:
+            textview.enable_spell_check(spell)
+            textview.enable()
+
+        textbuffer.set_modified(False)
+
+        # reraise error
+        if temp_exception is not None:
+            raise RichTextError('Error loading node {node_id}'.format(node_id=self._node.node_id), temp_exception)
+
+    def _load_images(self, textbuffer):
         """Load images present in textbuffer"""
         self._image_files.clear()
-        RichTextIO._load_images(self, textbuffer, html_filename)
+        for kind, it, param in iter_buffer_anchors(textbuffer, None, None):
+            child, widgets = param
+            if isinstance(child, RichTextImage):
+                self._load_image(textbuffer, child)
 
-    def _save_images(self, textbuffer, html_filename):
+    def _save_images(self, textbuffer):
         """Save images present in text buffer"""
         # reset saved image set
         self._saved_image_files.clear()
 
-        # don't allow the html file to be deleted
-        if html_filename:
-            self._saved_image_files.add(os.path.basename(html_filename))
-
-        RichTextIO._save_images(self, textbuffer, html_filename)
+        for kind, it, param in iter_buffer_anchors(textbuffer, None, None):
+            child, widgets = param
+            if isinstance(child, RichTextImage):
+                self._save_image(textbuffer, child)
 
         # delete images not part of the saved set
-        self._delete_images(html_filename,
-                            self._image_files - self._saved_image_files)
+        self._delete_images(self._image_files - self._saved_image_files)
         self._image_files = set(self._saved_image_files)
 
-    def _delete_images(self, html_filename, image_files):
+    def _delete_images(self, image_files):
         for image_file in image_files:
-            # only delete an image file if it is local
-            if is_local_file(image_file):
-                try:
-                    self._node.delete_file(image_file)
-                except:
-                    keepnote.log_error()
-                    pass
+            self._node.remove_additional_payload(image_file)
 
-    def _load_image(self, textbuffer, image, html_filename):
+    def _load_image(self, textbuffer, image):
         # TODO: generalize url recognition
         filename = image.get_filename()
-        if filename.startswith("http:/") or filename.startswith("file:/"):
+        if filename.startswith('http:/') or filename.startswith('file:/'):
             image.set_from_url(filename)
         elif is_relative_file(filename):
+            infile = None
             try:
-                infile = self._node.open_file(filename, mode="r")
+                infile = self._node.get_payload(filename).open('r')
                 image.set_from_stream(infile)
-                infile.close()
             except:
                 image.set_no_image()
+            finally:
+                if infile is not None:
+                    infile.close()
         else:
             image.set_from_file(filename)
 
         # record loaded images
         self._image_files.add(image.get_filename())
 
-    def _save_image(self, textbuffer, image, html_filename):
+    def _save_image(self, textbuffer, image):
         if image.save_needed():
-            out = self._node.open_file(image.get_filename(), mode="w")
-            image.write_stream(out, image.get_filename())
-            out.close()
+            outfile = None
+            try:
+                out = self._node.get_payload(image.get_filename()).open('w')
+                image.write_stream(out, image.get_filename())
+            finally:
+                if outfile is not None:
+                    out.close()
 
         # mark image as saved
         self._saved_image_files.add(image.get_filename())
@@ -175,21 +271,19 @@ class RichTextEditor (KeepNoteEditor):
         self._page = None                  # current NoteBookPage
         self._page_scrolls = {}            # remember scroll in each page
         self._page_cursors = {}
-        self._textview_io = NodeIO()
+        self._textview_io = NewRichTextIO()
 
         # editor
         self.connect("make-link", self._on_make_link)
 
         # textview and its callbacks
-        self._textview = RichTextView(RichTextBuffer(
-            self._app.get_richtext_tag_table()))  # textview
+        self._textview = RichTextView(RichTextBuffer(self._app.get_richtext_tag_table()))  # textview
         self._textview.disable()
         self._textview.connect("font-change", self._on_font_callback)
         self._textview.connect("modified", self._on_modified_callback)
         self._textview.connect("child-activated", self._on_child_activated)
         self._textview.connect("visit-url", self._on_visit_url)
-        self._textview.get_buffer().connect("ending-user-action",
-                                            self._on_text_changed)
+        self._textview.get_buffer().connect("ending-user-action", self._on_text_changed)
         self._textview.connect("key-press-event", self._on_key_press_event)
 
         # scrollbars
@@ -294,7 +388,7 @@ class RichTextEditor (KeepNoteEditor):
         self.save()
         self._save_cursor()
 
-        pages = [node for node in nodes if node.content_type == notebooklib.CONTENT_TYPE_PAGE]
+        pages = [node for node in nodes if node.content_type == keepnote.notebooknew.CONTENT_TYPE_HTML]
 
         if len(pages) == 0:
             self.clear_view()
@@ -305,23 +399,17 @@ class RichTextEditor (KeepNoteEditor):
             self._textview.enable()
 
             try:
-                self._textview.set_current_url(page.get_url(),
-                                               title=page.get_title())
+                self._textview.set_current_url(self._app.get_node_url(page), title=page.title)
                 self._textview_io.set_node(self._page)
-                self._textview_io.load(
-                    self._textview,
-                    self._textview.get_buffer(),
-                    self._page.get_page_file(),
-                    stream=self._page.open_file(
-                        self._page.get_page_file(), "r", "utf-8"))
+                self._textview_io.load(self._textview, self._textview.get_buffer())
                 self._load_cursor()
 
-            except RichTextError, e:
+            except RichTextError as e:
                 self.clear_view()
-                self.emit("error", e.msg, e)
-            except Exception, e:
+                self.emit("error", None, sys.exc_info())
+            except Exception as e:
                 self.clear_view()
-                self.emit("error", "Unknown error", e)
+                self.emit("error", "Unknown error", sys.exc_info())
 
         if len(pages) > 0:
             self.emit("view-node", pages[0])
@@ -331,8 +419,7 @@ class RichTextEditor (KeepNoteEditor):
             it = self._textview.get_buffer().get_insert_iter()
             self._page_cursors[self._page] = it.get_offset()
 
-            x, y = self._textview.window_to_buffer_coords(
-                gtk.TEXT_WINDOW_TEXT, 0, 0)
+            x, y = self._textview.window_to_buffer_coords(gtk.TEXT_WINDOW_TEXT, 0, 0)
             it = self._textview.get_iter_at_location(x, y)
             self._page_scrolls[self._page] = it.get_offset()
 
@@ -350,35 +437,30 @@ class RichTextEditor (KeepNoteEditor):
             buf = self._textview.get_buffer()
             it = buf.get_iter_at_offset(offset)
             mark = buf.create_mark(None, it, True)
-            self._textview.scroll_to_mark(
-                mark, 0.49, use_align=True, xalign=0.0)
+            self._textview.scroll_to_mark(mark, 0.49, use_align=True, xalign=0.0)
             buf.delete_mark(mark)
 
     def save(self):
         """Save the loaded page"""
 
         if self._page is not None and \
-           self._page.is_valid() and \
+           not self._page.is_deleted and \
            self._textview.is_modified():
 
             try:
                 # save text data
-                self._textview_io.save(
-                    self._textview.get_buffer(),
-                    self._page.get_page_file(),
-                    self._page.get_title(),
-                    stream=self._page.open_file(
-                        self._page.get_page_file(), "w", "utf-8"))
+                self._textview_io.save(self._textview.get_buffer())
+# WOUT
+# 
+#                 # save meta data
+#                 self._page.set_attr_timestamp("modified_time")
+#                 self._page.save()
 
-                # save meta data
-                self._page.set_attr_timestamp("modified_time")
-                self._page.save()
+            except RichTextError:
+                self.emit("error", None, sys.exc_info())
 
-            except RichTextError, e:
-                self.emit("error", e.msg, e)
-
-            except NoteBookError, e:
-                self.emit("error", e.msg, e)
+            except NoteBookError:
+                self.emit("error", None, sys.exc_info())
 
     def save_needed(self):
         """Returns True if textview is modified"""
@@ -407,10 +489,11 @@ class RichTextEditor (KeepNoteEditor):
         """Callback for textview modification"""
         self.emit("modified", self._page, modified)
 
-        # make notebook node modified
-        if modified:
-            self._page.mark_modified()
-            self._page.notify_change(False)
+# WOUT
+#         # make notebook node modified
+#         if modified:
+#             self._page.mark_modified()
+#             self._page.notify_change(False)
 
     def _on_child_activated(self, textview, child):
         """Callback for activation of textview child widget"""

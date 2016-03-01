@@ -25,6 +25,7 @@
 #
 
 # python imports
+from __future__ import unicode_literals
 import sys
 import re
 from HTMLParser import HTMLParser
@@ -71,13 +72,15 @@ XHTML_HEADER = ("""\
 """)
 XHTML_FOOTER = "</body></html>"
 
-HTML_HEADER = """<html>
+HTML_HEADER = """\
+<!DOCTYPE html>
+<html>
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta charset="UTF-8">
 """
 HTML_FOOTER = "</body></html>"
 
-BULLET_STR = u"\u2022 "
+BULLET_STR = "\u2022 "
 
 JUSTIFY_VALUES = set([
     "left",
@@ -124,8 +127,7 @@ def nest_indent_tags(contents, tag_table):
                     next_indent = tag.get_indent()
 
                     while indent > next_indent:
-                        yield ("end", None, tag_table.lookup(
-                            RichTextIndentTag.tag_name(indent)))
+                        yield ("end", None, tag_table.lookup(RichTextIndentTag.tag_name(indent)))
                         indent -= 1
 
                     indent_closing = False
@@ -147,8 +149,7 @@ def nest_indent_tags(contents, tag_table):
                     # open new indents until we match level
                     indent += 1
                     assert indent > 0
-                    yield ("begin", None, tag_table.lookup(
-                        RichTextIndentTag.tag_name(indent)))
+                    yield ("begin", None, tag_table.lookup(RichTextIndentTag.tag_name(indent)))
 
         elif (item[0] == "end" and
               isinstance(item[2], RichTextIndentTag)):
@@ -685,7 +686,7 @@ class HtmlTagListItemWriter (HtmlTagWriter):
 
     def write_tag_begin(self, out, dom, xhtml):
         if dom.kind == "bullet":
-            #self._out.write('<li style="list-style-type: disc">')
+            #out.write('<li style="list-style-type: disc">')
             out.write('<li>')
         else:
             out.write('<li style="list-style-type: none">')
@@ -901,7 +902,10 @@ class HtmlBuffer (HTMLParser):
         self._tag_writers.append(tag_writer)
 
     def set_output(self, out):
-        """Set the output stream for HTML"""
+        """Set the output stream for HTML
+        
+        @param out: A file-like object that accepts unicode strings, e.g. a file opened with encoding='utf-8' or a StringIO object.
+        """
         self._out = out
 
     #===========================================
@@ -1083,16 +1087,14 @@ class HtmlBuffer (HTMLParser):
     #================================================
     # Writing HTML
 
-    def write(self, buffer_content, tag_table, title=None,
-              partial=False, xhtml=True):
+    def write(self, buffer_content, tag_table, title=None, partial=False, xhtml=False):
         if not partial:
             self._write_header(title, xhtml=xhtml)
 
         # normalize contents, prepare them for DOM
         contents = normalize_tags(
             nest_indent_tags(find_paragraphs(buffer_content), tag_table),
-            is_stable_tag=lambda tag:
-            isinstance(tag, (RichTextIndentTag, RichTextParTag)))
+            is_stable_tag=lambda tag: isinstance(tag, (RichTextIndentTag, RichTextParTag)))
 
         dom = TextBufferDom(contents)
         self.prepare_dom_write(dom)
@@ -1101,13 +1103,13 @@ class HtmlBuffer (HTMLParser):
         if not partial:
             self._write_footer(xhtml=xhtml)
 
-    def _write_header(self, title, xhtml=True):
+    def _write_header(self, title, xhtml=False):
         if xhtml:
             self._out.write(XHTML_HEADER)
         else:
             self._out.write(HTML_HEADER)
         if title:
-            self._out.write(u"<title>%s</title>\n" % escape(title))
+            self._out.write("<title>{title}</title>\n".format(title=title))
         self._out.write("</head><body>")
 
     def _write_footer(self, xhtml=True):
