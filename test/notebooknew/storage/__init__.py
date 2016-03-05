@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 import base64
 import hashlib
 import io
 import os
-import StringIO as stringio
 import unittest
 
 from keepnote.notebooknew.storage import *
@@ -101,7 +101,7 @@ class NotebookStorageTestBase(object):
                 s,
                 content_type=u'<äëïöüß€&ש>',
                 attributes={ u'<äëïöüß€&ש>': u'<äëïöüß€&ש>' },
-                payloads=[(u'äëïöüß€ש', stringio.StringIO(payload_data.encode('utf-8')))],
+                payloads=[(u'äëïöüß€ש', io.BytesIO(payload_data.encode('utf-8')))],
                 payload_paths=[]
                 )
  
@@ -115,19 +115,6 @@ class NotebookStorageTestBase(object):
                 )
         actual = s.get_node(id_)
         self.assertEqual(expected, actual)
-    
-    def test_add_node_attributes_copied(self):
-        attributes = { 'key': 'value' }
-        
-        # Add node first.
-        s = self.create_notebook_storage()
-        id_ = add_node(s, attributes=attributes, payloads=[], payload_paths=[])
-        
-        # Change the local attributes object.
-        attributes['key'] = 'new value'
-
-        # Then read the attributes.
-        self.assertEqual('value', s.get_node(id_).attributes['key'])
  
     def test_get_node_nonexistent(self):
         s = self.create_notebook_storage()
@@ -332,20 +319,6 @@ class NotebookStorageTestBase(object):
         stored_node2=s.get_node(id_)
         self.assertEqual(attributes2, stored_node2.attributes)
     
-    def test_set_node_attributes_copied(self):
-        attributes = { 'key': 'value' }
-        
-        # Add node first.
-        s = self.create_notebook_storage()
-        id_ = add_node(s)
-        s.set_node_attributes(id_, attributes)
-
-        # Change the local attributes object.
-        attributes['key'] = 'new value'
-        
-        # Then read the attributes.
-        self.assertEqual('value', s.get_node(id_).attributes['key'])
-    
     def test_set_node_attributes_nonexistent_node(self):
         s = self.create_notebook_storage()
         with self.assertRaises(NodeDoesNotExistError):
@@ -376,6 +349,158 @@ class NotebookStorageTestBase(object):
 
         # Then read them.
         self.assertEqual('value', s.get_notebook().attributes['key'])
+    
+    def test_attributes_copied_add_node(self):
+        attributes = { 'key': 'value' }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes=attributes, payloads=[], payload_paths=[])
+        
+        # Change the local attributes object.
+        attributes['key'] = 'new value'
+
+        # Then read the attributes.
+        self.assertEqual('value', s.get_node(id_).attributes['key'])
+    
+    def test_attributes_copied_set_node_attributes(self):
+        attributes = { 'key': 'value' }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        s.set_node_attributes(id_, attributes)
+
+        # Change the local attributes object.
+        attributes['key'] = 'new value'
+        
+        # Then read the attributes.
+        self.assertEqual('value', s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_int_add_node(self):
+        value = 1
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes={ 'key': value }, payloads=[], payload_paths=[])
+        
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_int_set_node_attributes(self):
+        value = 1
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        
+        # Then set the attribute.
+        s.set_node_attributes(id_, attributes={ 'key': value })
+
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_float_add_node(self):
+        value = float(1.0)
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes={ 'key': value }, payloads=[], payload_paths=[])
+        
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_float_set_node_attributes(self):
+        value = float(1.0)
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        
+        # Then set the attribute.
+        s.set_node_attributes(id_, attributes={ 'key': value })
+
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_dict_add_node(self):
+        value = { 'subkey_string': 'value', 'subkey_int': 1, 'subkey_float': float(1.0), 'subkey_list': [], 'subkey_dict': {} }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes={ 'key': value }, payloads=[], payload_paths=[])
+        
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_dict_set_node_attributes(self):
+        value = { 'subkey_string': 'value', 'subkey_int': 1, 'subkey_float': float(1.0), 'subkey_list': [], 'subkey_dict': {} }
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        
+        # Then set the attribute.
+        s.set_node_attributes(id_, attributes={ 'key': value })
+
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_list_add_node(self):
+        value = [ 'value', 1, float(1.0), {}, [] ]
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes={ 'key': value }, payloads=[], payload_paths=[])
+        
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_list_set_node_attributes(self):
+        value = [ 'value', 1, float(1.0), {}, [] ]
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        
+        # Then set the attribute.
+        s.set_node_attributes(id_, attributes={ 'key': value })
+
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_none_add_node(self):
+        value = None
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s, attributes={ 'key': value }, payloads=[], payload_paths=[])
+        
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
+    
+    def test_attribute_type_none_set_node_attributes(self):
+        value = None
+        
+        # Add node first.
+        s = self.create_notebook_storage()
+        id_ = add_node(s)
+        
+        # Then set the attribute.
+        s.set_node_attributes(id_, attributes={ 'key': value })
+
+        # Then read the attribute.
+        s = self.create_notebook_storage()
+        self.assertEqual(value, s.get_node(id_).attributes['key'])
 
 
 # Utility functions

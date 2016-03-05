@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 """File system storage."""
+
+from __future__ import absolute_import
 
 import io
 import hashlib
@@ -8,6 +11,7 @@ import shutil
 import xml.etree.ElementTree as et
 
 from keepnote.notebooknew.storage import *
+import keepnote.plist
 
 __all__ = ['FileSystemStorage']
 
@@ -129,14 +133,17 @@ class FileSystemStorage(NotebookStorage):
 		node_id = node_id_el.text
 		content_type_el = root.find('content-type')
 		if content_type_el is None:
-			raise ParseError('Missing element <node-id>')
+			raise ParseError('Missing element <content-type>')
 		content_type = content_type_el.text
 		attributes = {}
-		for attribute_el in root.findall('attributes/attribute'):
-			key = attribute_el.get('key')
-			if key is None:
-				raise ParseError('Missing attribute \'key\' in element <attribute>')
-			attributes[attribute_el.get('key')] = attribute_el.text
+		attributes_el = root.find('attributes')
+		if attributes_el is not None:
+			attributes_dict_el = None
+			for child_el in attributes_el:
+				attributes_dict_el = child_el
+				break
+			if attributes_dict_el is not None:
+				attributes = self._convert_xml_subtree_to_data(attributes_dict_el)
 		payloads = []
 		payload_els = root.findall('payloads/payload')
 		for payload_el in payload_els:
@@ -204,6 +211,12 @@ class FileSystemStorage(NotebookStorage):
 		stored_notebook.attributes = attributes
 		self._write_notebook(stored_notebook)
 
+	def _convert_data_to_xml_subtree(self, data):
+		return keepnote.plist.dump_etree(data)
+	
+	def _convert_xml_subtree_to_data(self, subtree):
+		return keepnote.plist.load_etree(subtree)
+	
 	def _write_node(self, node_id, stored_node):
 		"""Writes a StoredNode to a file.
 		
@@ -221,10 +234,20 @@ class FileSystemStorage(NotebookStorage):
 		et.SubElement(node_el, 'content-type').text = stored_node.content_type
 		
 		attributes_el = et.SubElement(node_el, 'attributes')
-		for (key, value) in stored_node.attributes.iteritems():
-			attribute_el = et.SubElement(attributes_el, 'attribute')
-			attribute_el.set('key', key)
-			attribute_el.text = value
+		attributes_el.append(self._convert_data_to_xml_subtree(stored_node.attributes))
+# 		for (key, value) in stored_node.attributes.iteritems():
+# 			attribute_el = et.SubElement(attributes_el, 'attribute')
+# 			attribute_el.set('key', key)
+# 			value_type = type(value)
+# 			if value_type == str or value_type == unicode:
+# 				attribute_el.set('type', 'string')
+# 				attribute_el.text = value
+# 			elif value_type == int:
+# 				attribute_el.set('type', 'int')
+# 				attribute_el.text = str(value)
+# 			elif value_type == float:
+# 				attribute_el.set('type', 'float')
+# 				attribute_el.text = str(value)
 		
 		payloads_el = et.SubElement(node_el, 'payloads')
 		for payload in stored_node.payloads:
