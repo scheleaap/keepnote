@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 """Base class for classes that can store notebooks."""
 
+from __future__ import absolute_import
 import hashlib
 
 __all__ = [

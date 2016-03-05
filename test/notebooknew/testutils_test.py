@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 import unittest
 
 from keepnote.notebooknew import new_node_id
 from test.notebooknew import ContentFolderNodeTestBase
 
-from testutils import *
+from .testutils import *
 
 CONTENT_TYPE_TEST = u'application/x-notebook-test-node'
 

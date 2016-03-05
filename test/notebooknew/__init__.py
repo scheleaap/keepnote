@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
 import base64
 import copy
 from datetime import datetime
@@ -20,7 +22,7 @@ from keepnote.notebooknew.storage import StoredNode
 import keepnote.notebooknew.storage.mem
 from keepnote.pref import Pref
 
-from test.notebooknew.testutils import *
+from .testutils import *
 
 MS = 0.001  # 1 millisecond in seconds
 

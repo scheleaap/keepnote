@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
 import unittest
 
 from keepnote.notebooknew.storage.mem import *
-from test.notebooknew.storage import NotebookStorageTestBase 
+from . import NotebookStorageTestBase 
 
 class InMemoryStorageTest(unittest.TestCase, NotebookStorageTestBase):
     def __init__(self, *args, **kwargs):

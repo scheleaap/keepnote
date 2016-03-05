@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 from datetime import datetime
 import io
 from pytz import utc
@@ -13,7 +14,7 @@ from keepnote.notebooknew.dao import *
 import keepnote.notebooknew.storage as storage
 from keepnote.notebooknew.storage import StoredNode, StoredNodePayload
 
-from test.notebooknew.testutils import *
+from .testutils import *
 
 PARENT_ID_ATTRIBUTE = 'parent_id'
 MAIN_PAYLOAD_NAME_ATTRIBUTE = 'main_payload_name'

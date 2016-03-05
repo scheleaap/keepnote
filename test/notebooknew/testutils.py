@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
 import base64
 from datetime import datetime
 import hashlib
 import io
-import os
 from pytz import utc
 
 from keepnote.notebooknew import CONTENT_TYPE_HTML, FolderNode
-from keepnote.notebooknew import NotebookNode, NotebookNodePayload, IllegalOperationError
+from keepnote.notebooknew import NotebookNodePayload, IllegalOperationError
 from keepnote.notebooknew.dao import ReadFromStorageWriteToMemoryPayload
 from keepnote.notebooknew.storage import NotebookStorage
 
@@ -239,9 +240,9 @@ class ReadOnlyError(Exception):
 
 def write_notebook():
 	import keepnote.notebooknew.storage as storage
-	import dao
-	from storage import StoredNode
-	from dao import ROOT_SN, CHILD1_SN, CHILD11_SN, CHILD12_SN, CHILD121_SN, CHILD2_SN, CHILD21_SN, TRASH_SN
+	from keepnote.notebooknew.storage import StoredNode
+	import test.notebooknew.dao as dao
+	from test.notebooknew.dao import ROOT_SN, CHILD1_SN, CHILD11_SN, CHILD12_SN, CHILD121_SN, CHILD2_SN, CHILD21_SN, TRASH_SN
 	
 	def add_storage_node(notebook_storage, sn):
 		notebook_storage.add_node(
@@ -251,7 +252,7 @@ def write_notebook():
 				payloads=[ (p.name, p.get_data()) for p in sn.payloads ]
 				)
 	
-	notebook_storage = storage.fs.FileSystemStorage(dir='D:/keepnote/keepnote/nbs/nieuw_boek')
+	notebook_storage = storage.fs.FileSystemStorage(dir='D:/Programma\'s/Projecten/keepnote/nbs/nieuw_boek')
 	add_storage_node(notebook_storage, ROOT_SN)
 	add_storage_node(notebook_storage, TRASH_SN)
 	notebook_storage.add_node(
