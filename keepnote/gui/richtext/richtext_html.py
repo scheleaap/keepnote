@@ -77,6 +77,7 @@ HTML_HEADER = """\
 <html>
 <head>
 <meta charset="UTF-8">
+<body>\
 """
 HTML_FOOTER = "</body></html>"
 

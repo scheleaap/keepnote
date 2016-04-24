@@ -1,8 +1,6 @@
 # NotebookNode
 
 - "TODO" invullen
-- new child with duplicate id
-- remove node._unsaved_changes from tests
 - Notebook.ui_prefs
   - set attributes -> save -> get attributes
 - multiple trash nodes
@@ -14,35 +12,20 @@
 - integration test: opening a notebook with 1000 assets takes <= 0.5 seconds
 - integration test: saving a notebook with 1000 assets takes <= 0.5 seconds
 - _add_unbound_node_as_child() invoeren -- notebook en parent als constructorparameter verwijderen en _add_child_node() vervangen
+- modification time when changing payload (depends on whether the changes come from the DAO or not)
+- create root node after first sync
+- create trash on first delete
 
 x create_copy()
 - receive_moving_node(node, after)
 
 Notebook
-x	title
 	default_font   The default font for new nodes.
 	icons          A set of icons that can be assigned to nodes.
-x	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
-Node
-x	created_time   Timestamp of the time at which the node was created
-x	modified_time  Timestamp of the time at which the node was last modified
-	order          (?)
-x	icon_normal    Associated icon (usually displayed in tree or list views)
-x	icon_open      Associated icon when node is open (usually displayed in tree or list views)
-x	title_fgcolor  Title foreground color (usually displayed in tree or list views)
-x	title_bgcolor  Title background color (usually displayed in tree or list views)
-?	duplicate_of
-?	trashed_from/deleted_from
-x	client_preferences Client preferences (e.g. the window state, the list view column configuration, quick pick color and quick pick icons)
-x	has_children()
--	get_parent()
--	get_notebook()
 
 ContentNode/FolderNode/TrashNode
-	modifying order, title_color_* -> is dirty == True
-	saving order, title_color_*
+	modifying order -> is dirty == True
 	test that order actually determines the order (or does the ListView take care of that?)
-	making sure 0 < order < len(children)
 
 ContentNode/FolderNode
 	trash()

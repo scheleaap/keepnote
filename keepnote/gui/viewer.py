@@ -107,24 +107,20 @@ class Viewer (gtk.VBox):
     def get_selected_nodes(self):
         return []
 
-    def new_node(self, kind, pos, parent=None):
-
+    def new_node(self, kind, where, parent=None):
         if parent is None:
-            parent = self._notebook
+            parent = self._notebook.root
 
-        if pos == "sibling" and parent.get_parent() is not None:
-            index = parent.get_attr("order") + 1
-            parent = parent.get_parent()
+        if where == "sibling" and parent.parent is not None:
+            index = parent.parent.children.index(parent) + 1
+            parent = parent.parent
         else:
             index = None
 
         if kind == notebooklib.CONTENT_TYPE_DIR:
-            node = parent.new_child(notebooklib.CONTENT_TYPE_DIR,
-                                    notebooklib.DEFAULT_DIR_NAME,
-                                    index)
+            node = self._app.new_folder_node(parent, index=index)
         else:
-            node = notebooklib.new_page(
-                parent, title=notebooklib.DEFAULT_PAGE_NAME, index=index)
+            node = self._app.new_content_node(parent, index=index)
 
         return node
 

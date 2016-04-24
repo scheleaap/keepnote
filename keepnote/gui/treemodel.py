@@ -60,7 +60,7 @@ def get_path_from_node(model, node, node_col):
     node_path = []
     while node not in root_set:
         node_path.append(node)
-        node = node.get_parent()
+        node = node.parent
         if node is None:
             # node is not in the model (e.g. listview subset)
             return None
@@ -298,7 +298,7 @@ class BaseTreeModel (gtk.GenericTreeModel):
                 rowref = self.create_tree_iter(node)
 
                 self.row_inserted(path, rowref)
-                parent = node.get_parent()
+                parent = node.parent
                 if len(parent.get_children()) == 1:
                     rowref2 = self.create_tree_iter(parent)
                     self.row_has_child_toggled(path[:-1], rowref2)

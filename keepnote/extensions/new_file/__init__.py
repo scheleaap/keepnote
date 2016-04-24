@@ -241,8 +241,8 @@ class Extension (extension.Extension):
             parent = notebook
         else:
             sibling = nodes[0]
-            if sibling.get_parent():
-                parent = sibling.get_parent()
+            if sibling.parent:
+                parent = sibling.parent
                 index = sibling.get_attr("order") + 1
             else:
                 parent = sibling

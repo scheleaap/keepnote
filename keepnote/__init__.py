@@ -1459,7 +1459,40 @@ class Application(object):
         location = self._opened_notebook_information_by_notebook[notebook].location
         
         return u"nbk://%s/%s" % (location, node.node_id)
-
+    
+    def new_content_node(self, parent, title=None, index=None):
+        """Add a new content node to a node in a notebook"""
+        
+        if title is None:
+            title = notebooklib.DEFAULT_PAGE_TITLE
+        
+        child = keepnote.notebooknew.ContentNode(
+                notebook=None,
+                content_type=notebooklib.CONTENT_TYPE_PAGE,
+                parent=parent,
+                loaded_from_storage=False,
+                title=title,
+                main_payload=(notebooklib.DEFAULT_MAIN_PAYLOAD_NAME, notebooklib.BLANK_NOTE),
+                additional_payloads=[],
+                )
+        parent.add_new_node_as_child(child)
+        
+        return child
+    
+    def new_folder_node(self, parent, title=None, index=None):
+        """Add a new folder node to a node in a notebook"""
+        
+        if title is None:
+            title = notebooklib.DEFAULT_FOLDER_TITLE
+        
+        child = keepnote.notebooknew.FolderNode(
+                parent=parent,
+                loaded_from_storage=False,
+                title=title,
+                )
+        parent.add_new_node_as_child(child)
+        
+        return child
 
 def unzip(filename, outdir):
     """Unzip an extension"""

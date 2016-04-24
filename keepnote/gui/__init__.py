@@ -405,8 +405,7 @@ class GuiApplication(keepnote.Application):
         self._windows = []
 
         # shared gui resources
-        self._tag_table = (
-            keepnote.gui.richtext.richtext_tags.RichTextTagTable())
+        self._tag_table = (keepnote.gui.richtext.richtext_tags.RichTextTagTable())
         self.init_dialogs()
 
         # auto save
@@ -415,10 +414,8 @@ class GuiApplication(keepnote.Application):
         self._auto_save_pause = 0           # >0 if autosave is paused
 
     def init_dialogs(self):
-        self.app_options_dialog = (
-            keepnote.gui.dialog_app_options.ApplicationOptionsDialog(self))
-        self.node_icon_dialog = (
-            keepnote.gui.dialog_node_icon.NodeIconDialog(self))
+        self.app_options_dialog = (keepnote.gui.dialog_app_options.ApplicationOptionsDialog(self))
+        self.node_icon_dialog = (keepnote.gui.dialog_node_icon.NodeIconDialog(self))
 
     def set_lang(self):
         """Set language for application"""
@@ -426,8 +423,7 @@ class GuiApplication(keepnote.Application):
 
         # setup glade with gettext
         import gtk.glade
-        gtk.glade.bindtextdomain(keepnote.GETTEXT_DOMAIN,
-                                 keepnote.get_locale_dir())
+        gtk.glade.bindtextdomain(keepnote.GETTEXT_DOMAIN, keepnote.get_locale_dir())
         gtk.glade.textdomain(keepnote.GETTEXT_DOMAIN)
 
         # re-initialize dialogs
@@ -442,8 +438,7 @@ class GuiApplication(keepnote.Application):
         p.get("autosave_time", default=DEFAULT_AUTOSAVE_TIME)
 
         # set style
-        set_gtk_style(font_size=p.get("look_and_feel", "app_font_size",
-                                      default=10))
+        set_gtk_style(font_size=p.get("look_and_feel", "app_font_size", default=10))
 
         # let windows load their preferences
         for window in self._windows:
@@ -626,17 +621,17 @@ class GuiApplication(keepnote.Application):
         """Save all opened notebooks"""
 
         # clear all window and viewer info in notebooks
-        for notebook in self._notebooks.itervalues():
-            notebook.client_preferences.clear("windows", "ids")
-            notebook.client_preferences.clear("viewers", "ids")
+        for opened_notebook_information in self._opened_notebook_information_by_notebook.itervalues():
+            opened_notebook_information.notebook.client_preferences.clear("windows", "ids")
+            opened_notebook_information.notebook.client_preferences.clear("viewers", "ids")
 
         # save all the windows
         for window in self._windows:
             window.save_notebook(silent=silent)
 
         # save all the notebooks
-        for notebook in self._notebooks.itervalues():
-            notebook.save()
+        for opened_notebook_information in self._opened_notebook_information_by_notebook.itervalues():
+            opened_notebook_information.dao.sync()
 
         # let windows know about completed save
         for window in self._windows:

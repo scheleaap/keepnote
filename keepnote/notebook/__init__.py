@@ -63,9 +63,12 @@ _ = trans.translate
 # for the time being.
 # constants
 NOTE_HEADER = u"""\
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" """ + """\
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"><body>"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<body>\
+"""
 NOTE_FOOTER = u"</body></html>"
 BLANK_NOTE = NOTE_HEADER + NOTE_FOOTER
 
@@ -78,11 +81,14 @@ NOTEBOOK_META_DIR = u"__NOTEBOOK__"
 NOTEBOOK_ICON_DIR = u"icons"
 TRASH_DIR = u"__TRASH__"
 TRASH_NAME = u"Trash"
-DEFAULT_PAGE_NAME = u"New Page"
-DEFAULT_DIR_NAME = u"New Folder"
+DEFAULT_PAGE_TITLE = u"New Page"
+DEFAULT_FOLDER_TITLE = u"New Folder"
+DEFAULT_PAGE_NAME = DEFAULT_PAGE_TITLE
+DEFAULT_DIR_NAME = DEFAULT_FOLDER_TITLE
+DEFAULT_MAIN_PAYLOAD_NAME = u"page.html"
 
 # content types
-CONTENT_TYPE_PAGE = u"text/xhtml+xml"
+CONTENT_TYPE_PAGE = u"text/html"
 #CONTENT_TYPE_PLAIN_TEXT = "text/plain"
 CONTENT_TYPE_TRASH = u"application/x-notebook-trash"
 CONTENT_TYPE_DIR = u"application/x-notebook-dir"

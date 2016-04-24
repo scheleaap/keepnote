@@ -913,7 +913,7 @@ class KeepNoteWindow (gtk.Window):
             if node.content_type == notebooklib.CONTENT_TYPE_TRASH:
                 self.error(_("The Trash folder cannot be deleted."), None)
                 return False
-            if node.get_parent() is None:
+            if node.parent is None:
                 self.error(_("The top-level folder cannot be deleted."), None)
                 return False
 

@@ -524,7 +524,7 @@ class KeepNoteBaseTreeView(gtk.TreeView):
                 except:
                     path = None
                 if path is not None:
-                    parent = node.get_parent()
+                    parent = node.parent
 
                     # NOTE: parent may lose expand state if it has one child
                     # therefore, we should expand parent if it exists and is
@@ -685,13 +685,16 @@ class KeepNoteBaseTreeView(gtk.TreeView):
 
     def on_editing_started(self, cellrenderer, editable, path, attr, validator=TextRendererValidator()):
         """Callback for start of title editing"""
+        
+        assert attr == 'title'
+        
         # remember editing state
         self.editing_path = path
 
         # get node being edited and init gtk.Entry widget
         node = self.model.get_value(self.model.get_iter(path), self._node_col)
         if node is not None:
-            val = node.get_attr(attr)
+            val = node.title
             try:
                 editable.set_text(validator.format(val))
             except:
@@ -706,6 +709,8 @@ class KeepNoteBaseTreeView(gtk.TreeView):
 
     def on_edit_attr(self, cellrenderertext, path, attr, new_text, validator=TextRendererValidator()):
         """Callback for completion of title editing"""
+        
+        assert attr == 'title'
 
         # remember editing state
         self.editing_path = None
@@ -725,7 +730,7 @@ class KeepNoteBaseTreeView(gtk.TreeView):
 
         # set new attr and catch errors
         try:
-            node.set_attr(attr, new_val)
+            node.title = new_val
         except NoteBookError, e:
             self.emit("error", e.msg, e)
 
@@ -850,7 +855,7 @@ class KeepNoteBaseTreeView(gtk.TreeView):
         if len(selected) > 0:
             parent = selected[0]
         else:
-            parent = self._notebook
+            parent = self._notebook.root
 
         # find nodes to paste
         nodeids = selection_data.data.split(";")
@@ -1218,14 +1223,14 @@ class KeepNoteBaseTreeView(gtk.TreeView):
         while ptr is not None:
             if ptr == source_node:
                 return False
-            ptr = ptr.get_parent()
+            ptr = ptr.parent
 
         drop_into = (drop_position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE or
                      drop_position == gtk.TREE_VIEW_DROP_INTO_OR_AFTER)
 
         return (
             # (1) do not let nodes move out of notebook root
-            not (target_node.get_parent() is None and not drop_into) and
+            not (target_node.parent is None and not drop_into) and
 
             # (2) do not let nodes move into nodes that don't allow children
             not (not target_node.allows_children() and drop_into) and
@@ -1234,7 +1239,7 @@ class KeepNoteBaseTreeView(gtk.TreeView):
             #     or new_parent == old_parent
             not (source_node and
                  self._reorder == REORDER_FOLDER and not drop_into and
-                 target_node.get_parent() == source_node.get_parent()))
+                 target_node.parent == source_node.parent))
 
 
 gobject.type_register(KeepNoteBaseTreeView)

@@ -1,31 +1,18 @@
 Do something more intelligent in the test_validation_*() methods
-Create root node after first sync
-Create trash on first delete
 Implement node timestamp in NotebookStorage
 Implement nodes: new in local, new in remote, changed in local sync
-x	content_type
-x	parent_id
-x	title
-x	created_time
-x	modified_time
 	order
-x	icon_normal
-x	icon_open
-x	title_fgcolor
-x	title_bgcolor
-x	client_preferences
-x	payload
 	test_deleted_in_local (enable test)
 	parent set in NN
 	dirty == false after sync
 Implement changed in remote sync
 	all attributes
 	payload
+		test scenario: Notebook is loaded. The payload is changed by remote. Dao.sync() is called. (It will look like the payload was changed locally, since the md5hash in the Notebook will have the old value.) The ContentNode's payload must be changed; no conflict may occur, the node may not be duplicated.
 Implement deleted in remote (a disabled test exists in StructureTest)
 Additional attributes in storage kept, not overwritten
-Implement notebook
-	title
-
+Node payload: klopt de MD5 original hash wel nadat de payload veranderd en er opgeslagen is?
+Node payload: wat voor payloadobject moet een node krijgen als hij nog nooit is opgeslagen?
 
 # Things to migrate:
 

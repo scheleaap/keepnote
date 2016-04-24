@@ -382,7 +382,7 @@ class ThreePaneViewer (Viewer):
             if len(nodes) == 1:
                 node = nodes[0]
                 widget = self.get_focused_widget(self.listview)
-                parent = node.get_parent()
+                parent = node.parent
                 children = parent.get_children()
                 i = children.index(node)
 
@@ -478,7 +478,7 @@ class ThreePaneViewer (Viewer):
             node = nodes[0]
 
         # get parent
-        parent = node.get_parent()
+        parent = node.parent
         if parent is not None:
             self.goto_node(parent, direct=False)
 
@@ -503,7 +503,7 @@ class ThreePaneViewer (Viewer):
             node = nodes[0]
             self._app.on_attach_file(node, self.get_toplevel())
 
-    def new_node(self, kind, pos, parent=None):
+    def new_node(self, kind, where, parent=None):
         """Add a new node to the notebook"""
 
         # TODO: think about where this goes
@@ -519,9 +519,9 @@ class ThreePaneViewer (Viewer):
             if len(nodes) == 1:
                 parent = nodes[0]
             else:
-                parent = self._notebook
+                parent = self._notebook.root
 
-        node = Viewer.new_node(self, kind, pos, parent)
+        node = super(ThreePaneViewer, self).new_node(kind, where, parent)
 
         self._view_new_node(node)
 
@@ -529,7 +529,7 @@ class ThreePaneViewer (Viewer):
         """Add new folder near selected nodes"""
         self.new_node(notebooklib.CONTENT_TYPE_DIR, "sibling")
 
-    def on_new_page(self):
+    def on_new_sibling_page(self):
         """Add new page near selected nodes"""
         self.new_node(notebooklib.CONTENT_TYPE_PAGE, "sibling")
 
@@ -586,7 +586,7 @@ class ThreePaneViewer (Viewer):
                     path = []
                     break
                 path.append(ptr)
-                ptr = ptr.get_parent()
+                ptr = ptr.parent
 
             # find first node that is collapsed
             node2 = None
@@ -999,7 +999,7 @@ class ThreePaneViewer (Viewer):
 
             ("New Page", gtk.STOCK_NEW, _("New _Page"),
              "<control>N", _("Create a new page"),
-             lambda w: self.on_new_page(), "note-new.png"),
+             lambda w: self.on_new_sibling_page(), "note-new.png"),
 
             ("New Child Page", gtk.STOCK_NEW, _("New _Child Page"),
              "<control><shift>N", _("Create a new child page"),
