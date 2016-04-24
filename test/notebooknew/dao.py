@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import
 from datetime import datetime
+from hamcrest import *
 import io
 from pytz import utc
 import unittest
@@ -56,6 +57,18 @@ def add_storage_node(notebook_storage, sn):
 def datetime_to_timestamp(dt):
 	# From https://docs.python.org/3.3/library/datetime.html#datetime.datetime.timestamp
 	return (dt - datetime(1970, 1, 1, tzinfo=utc)).total_seconds()
+
+class GeneralTest(unittest.TestCase):
+	def test_create_payload_for_new_node(self):
+		notebook_storage = storage.mem.InMemoryStorage()
+		notebook = Notebook()
+		dao = Dao(notebook, notebook_storage, [ ])
+		
+		payload = dao.create_payload_for_new_node(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA)
+		
+		assert_that(payload.name, equal_to(DEFAULT_HTML_PAYLOAD_NAME))
+		assert_that(payload.open('r').read(), equal_to(DEFAULT_HTML_PAYLOAD_DATA))
+
 
 class StructureTest(unittest.TestCase):
 	def test_new_in_remote_only_root(self):
@@ -1114,7 +1127,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1124,6 +1137,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		self.assertEqual(node.main_payload_name, notebook_storage.get_node(node.node_id).attributes[MAIN_PAYLOAD_NAME_ATTRIBUTE])
 		self.assertEqual(True, StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_main_payload_changed_in_local(self):
 		root = TestNotebookNode()
@@ -1131,7 +1149,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1143,6 +1161,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		
 		self.assertEqual(True, StoredNodePayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_HTML_PAYLOAD_NAME).read())
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_main_payload_new_in_remote(self):
 		sn = self._create_storage_node(
@@ -1170,7 +1193,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[TestPayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA), TestPayload(DEFAULT_JPG_PAYLOAD_NAME, DEFAULT_JPG_PAYLOAD_DATA)],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1182,6 +1205,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		self.assertEqual(True, StoredNodePayload(DEFAULT_JPG_PAYLOAD_NAME, DEFAULT_JPG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_PNG_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_PNG_PAYLOAD_NAME).read())
 		self.assertEqual(node.payloads[DEFAULT_JPG_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_JPG_PAYLOAD_NAME).read())
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_additional_payload_added_in_local(self):
 		root = TestNotebookNode()
@@ -1189,7 +1217,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1201,6 +1229,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		self.assertEqual(node.additional_payload_names, [p.name for p in notebook_storage.get_node(node.node_id).payloads if p.name != node.main_payload_name])
 		self.assertEqual(True, StoredNodePayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_PNG_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_PNG_PAYLOAD_NAME).read())
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_additional_payload_changed_in_local(self):
 		root = TestNotebookNode()
@@ -1208,7 +1241,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[TestPayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA)],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1220,6 +1253,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		
 		self.assertEqual(True, StoredNodePayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_JPG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
 		self.assertEqual(node.payloads[DEFAULT_PNG_PAYLOAD_NAME].open().read(), notebook_storage.get_node_payload(node.node_id, DEFAULT_PNG_PAYLOAD_NAME).read())
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_additional_payload_removed_in_local(self):
 		root = TestNotebookNode()
@@ -1227,7 +1265,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				main_payload=TestPayload(DEFAULT_HTML_PAYLOAD_NAME, DEFAULT_HTML_PAYLOAD_DATA),
 				additional_payloads=[TestPayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA)],
 				parent=root, add_to_parent=True)
-		notebook_storage = storage.mem.InMemoryStorage()
+		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
 		notebook.root = node
 		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
@@ -1237,6 +1275,11 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		dao.sync()
 		
 		self.assertEqual(False, StoredNodePayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_HASH) in notebook_storage.get_node(node.node_id).payloads)
+		
+		notebook_storage.read_only = True
+		dao.sync()
+		
+		# Expected: no exception
 	
 	def test_additional_payload_new_in_remote(self):
 		sn = self._create_storage_node(
@@ -1297,20 +1340,46 @@ class ReadFromStorageWriteToMemoryPayloadTest(unittest.TestCase):
 		self.assertEqual(DEFAULT_PNG_PAYLOAD_DATA, payload.open(mode='r').read())
 		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.get_md5hash())
 	
-	def test_reset(self):
-		original_reader = lambda: io.BytesIO(DEFAULT_HTML_PAYLOAD_DATA)
+	def test_commit(self):
+		original_data = DEFAULT_HTML_PAYLOAD_DATA
+		def original_reader():
+			return io.BytesIO(original_data)
 		payload = ReadFromStorageWriteToMemoryPayload(
 				name=DEFAULT_HTML_PAYLOAD_NAME,
 				original_reader=original_reader,
 				original_md5hash=DEFAULT_HTML_PAYLOAD_HASH,
 				)
-		
 		with payload.open(mode='w') as f:
 			f.write(DEFAULT_PNG_PAYLOAD_DATA)
-		payload.reset()
 		
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_DATA, payload.open(mode='r').read())
-		self.assertEqual(DEFAULT_HTML_PAYLOAD_HASH, payload.get_md5hash())
+		payload.commit()
+		
+		# Change original_data to something else to make sure that the object really uses the reader instead of
+		# returning the cached data.
+		original_data = DEFAULT_JPG_PAYLOAD_DATA
+		self.assertEqual(DEFAULT_JPG_PAYLOAD_DATA, payload.open(mode='r').read())
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.get_md5hash())
+	
+	def test_init_with_no_original_payload(self):
+		payload = ReadFromStorageWriteToMemoryPayload(
+				name=DEFAULT_HTML_PAYLOAD_NAME,
+				original_reader=None,
+				original_md5hash=None,
+				)
+		
+		with self.assertRaises(PayloadNotInStorageError):
+			payload.open(mode='r')
+		with self.assertRaises(PayloadNotInStorageError):
+			payload.get_md5hash()
+		with self.assertRaises(PayloadNotInStorageError):
+			payload.commit()
+
+		with payload.open(mode='w') as f:
+			f.write(DEFAULT_PNG_PAYLOAD_DATA)
+		payload.commit(original_reader = lambda: io.BytesIO(DEFAULT_PNG_PAYLOAD_DATA))
+		
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_DATA, payload.open(mode='r').read())
+		self.assertEqual(DEFAULT_PNG_PAYLOAD_HASH, payload.get_md5hash())
 
 
 class FolderNodeTest(ContentFolderNodeTest, unittest.TestCase):

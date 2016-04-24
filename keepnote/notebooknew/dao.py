@@ -18,6 +18,7 @@ __all__ = [
 		'NotebookNodeDao',
 		'ContentNodeDao',
 		'FolderNodeDao',
+		'PayloadNotInStorageError',
 		'StoredNodePayloadWithData',
 		'ReadFromStorageWriteToMemoryPayload',
 		'TrashNodeDao',
@@ -258,6 +259,23 @@ class Dao(object):
 		raise StoredNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
 				content_type=sn.content_type))
 	
+	def create_payload_for_new_node(self, payload_name, payload_data):
+		"""Returns a NotebookNodePayload instance that can be used for a new ContentNode.
+		
+		@param payload_name: The name of the payload.
+		@param payload_data: The data of the payload.
+		"""
+		payload = ReadFromStorageWriteToMemoryPayload(
+						name=payload_name,
+						original_reader=None,
+						original_md5hash=None,
+						)
+		
+		with payload.open(mode='w') as f:
+			f.write(payload_data)
+		
+		return payload
+	
 	def _remove_deleted_in_local_from_remote(self, node_ids):
 		for node_id in node_ids:
 			self._notebook_storage.remove_node(node_id)
@@ -328,8 +346,7 @@ class ContentNodeDao(NotebookNodeDao):
 		client_preferences = get_attribute_value(CLIENT_PREFERENCES_ATTRIBUTE, sn.attributes)
 		
 		if not sn.payloads:
-			raise InvalidStructureError('Content node {node_id} has no payload'.format(
-					node_id=sn.node_id))
+			raise InvalidStructureError('Content node {node_id} has no payload'.format(node_id=sn.node_id))
 			
 		main_payload_name = get_attribute_value(MAIN_PAYLOAD_NAME_ATTRIBUTE, sn.attributes)
 		
@@ -448,7 +465,7 @@ class FolderNodeDao(AbstractFolderTrashNodeDao):
 class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 	"""A NotebookNodePayload that returns the original payload data or the changed data if the payload has been written.
 
-	open(mode='r') will return the result of original_reader() als long as open(mode='w') has not been called or if
+	open(mode='r') will return the result of original_reader() as long as open(mode='w') has not been called or if
 	reset() has been called afterwards. Otherwise, it will return the last data that was written using open(mode='w').
 	
 	The changed payload data is kept in memory.
@@ -476,30 +493,46 @@ class ReadFromStorageWriteToMemoryPayload(NotebookNodePayload):
 		super(ReadFromStorageWriteToMemoryPayload, self).__init__(
 				name=name,
 				)
-		self.original_reader = original_reader
-		self.original_md5hash = original_md5hash
-		self.new_data = None
-		self._md5hash = self.original_md5hash
+		self._original_reader = original_reader
+		self._original_md5hash = original_md5hash
+		self._new_data = None
+		self._new_data_md5hash = None
 	
+	def commit(self, original_reader=None):
+		"""Removes the new data, sets the hash to the original payload data to the hash of the new data and optionally sets the reader of the original data.
+		
+		@param original_reader: Set the reader of the original data if not None.
+		"""
+		if self._original_reader is None and self._new_data is None:
+			raise PayloadNotInStorageError('The payload neither has a reader nor has been set')
+		if original_reader is not None:
+			self._original_reader = original_reader
+		self._original_md5hash = self._new_data_md5hash
+		self._new_data = None
+		self._new_data_md5hash = None
+		
 	def get_md5hash(self):
-		return self._md5hash
+		if self._new_data is None:
+			if self._original_reader is None:
+				raise PayloadNotInStorageError('The payload neither has a reader nor has been set')
+			return self._original_md5hash
+		else:
+			return self._new_data_md5hash
 	
 	def open(self, mode='r'):
 		if mode == 'w':
 			def on_close(new_data):
-				self.new_data = new_data
-				self._md5hash = hashlib.md5(self.new_data).hexdigest()
+				self._new_data = new_data
+				self._new_data_md5hash = hashlib.md5(self._new_data).hexdigest()
 			return ReadFromStorageWriteToMemoryPayload.CapturingBytesIO(on_close)
 		else:
-			if self.new_data is not None:
-				return io.BytesIO(self.new_data)
+			if self._new_data is not None:
+				return io.BytesIO(self._new_data)
 			else:
-				return self.original_reader()
-	
-	def reset(self):
-		"""Removes the new data."""
-		self.new_data = None
-		self._md5hash = self.original_md5hash
+				if self._original_reader is None:
+					raise PayloadNotInStorageError('The payload neither has a reader nor has been set')
+				return self._original_reader()
+
 
 
 class TrashNodeDao(AbstractFolderTrashNodeDao):
@@ -514,6 +547,10 @@ class DaoError(Exception):
 
 
 class InvalidStructureError(DaoError):
+	pass
+
+
+class PayloadNotInStorageError(DaoError):
 	pass
 
 
