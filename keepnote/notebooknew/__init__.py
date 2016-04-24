@@ -93,7 +93,10 @@ class Notebook(object):
 	@ivar trash: The trash node, a TrashNode instance.
 	@ivar title: The title of the notebook.
 	@ivar client_preferences: A Pref instance containing the notebook's client preferences.
-	@ivar node_changed_listeners: A Listeners instance containing the listeners to be notified when a node changes.
+	@ivar node_added_listeners: A Listeners instance containing the listeners to be notified after a node was added to the notebook. Listeners will be called with the following parameters: node, old_parent, new_parent.
+	@ivar node_removed_listeners: A Listeners instance containing the listeners to be notified after a node was removed from the notebook.
+	@ivar node_moved_listeners: A Listeners instance containing the listeners to be notified after a node was moved.
+	@ivar node_changed_listeners: A Listeners instance containing the listeners to be notified after a node changed.
 	@ivar closing_listeners: A listeners instance containing the listeners to be notified when the notebook is going to close.
 	@ivar close_listeners: A listeners instance containing the listeners to be notified just before the notebook closes.
 	@ivar is_dirty: TODO
@@ -102,18 +105,21 @@ class Notebook(object):
 	def __init__(self, title=None):
 		"""Constructor.
 		"""
-		self.root = None
+		self._root = None
 		self.trash = None
 		self.title = title
 		self.client_preferences = Pref()
+		self.node_added_listeners = Listeners()
+		self.node_removed_listeners = Listeners()
+		self.node_moved_listeners = Listeners()
 		self.node_changed_listeners = Listeners()
 		self.closing_listeners = Listeners()
 		self.close_listeners = Listeners()
 		self._client_event_listeners = {}
 	
 	def close(self):
-		self.closing_listeners.notify()
-		self.close_listeners.notify()
+		self.closing_listeners.notify(self)
+		self.close_listeners.notify(self)
 	
 	def get_client_event_listeners(self, key):
 		"""Returns a custom event listeners object for the notebook's client, creating it if necessary.
@@ -152,6 +158,10 @@ class Notebook(object):
 	def is_dirty(self):
 		"""TODO"""
 		return any([node.is_dirty for node in self._traverse_tree()])
+	
+	@property
+	def root(self):
+		return self._root
 	
 	def _traverse_tree(self):
 		"""A generator method that yields all NotebookNodes in the notebook."""
@@ -366,6 +376,7 @@ class NotebookNode(object):
 		
 		self._icon_normal = icon_normal
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def icon_open(self):
@@ -378,6 +389,7 @@ class NotebookNode(object):
 		
 		self._icon_open = icon_open
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 	
 	def is_node_a_child(self, node):
 		"""Returns whether another node is a child of this node."""
@@ -423,12 +435,14 @@ class NotebookNode(object):
 		self._modified_time = modified_time
 	
 	def move(self, target, behind=None):
-		"""Moves the node to a new paretn.
+		"""Moves the node to a new parent.
+		
+		If successful, the node_moved event will be emitted by the notebook.
+		
+		Cannot be used to move a node to another workbook. Use copy() for that instead.
 		
 		@param target: The node's new parent.
 		@param behind: A child of the target node behind which this node must be placed. If None, the node will be added as the last child.
-		
-		Cannot be used to move a node to another workbook. Use copy() for that instead.
 		
 		@raise IllegalOperationError: If can_move() returns True.
 		"""
@@ -440,6 +454,7 @@ class NotebookNode(object):
 	
 	def _on_client_preferences_change(self):
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 	
 	def _remove_child_node(self, child_node):
 		assert child_node in self._children
@@ -456,6 +471,7 @@ class NotebookNode(object):
 		
 		self._title = title
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def title_color_background(self):
@@ -468,6 +484,7 @@ class NotebookNode(object):
 		
 		self._title_color_background = title_color_background
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def title_color_foreground(self):
@@ -480,6 +497,7 @@ class NotebookNode(object):
 		
 		self._title_color_foreground = title_color_foreground
 		self.modified_time = datetime.now(tz=utc)
+		self._notebook.node_changed_listeners.notify(self)
 
 
 class NotebookNodePayload(object):
@@ -530,7 +548,11 @@ class AbstractContentFolderNode(NotebookNode):
 			raise IllegalOperationError('Cannot add a child to a deleted node')
 		if child_node.is_deleted:
 			raise IllegalOperationError('Trying to add a deleted node as a child')
+		
 		self._add_unbound_node_as_child(child_node)
+		
+		if self._notebook is not None:
+			self._notebook.node_added_listeners.notify(child_node, parent=self)
 	
 	def can_add_new_node_as_child(self):
 		if self.is_in_trash or self.is_deleted:
@@ -559,6 +581,8 @@ class AbstractContentFolderNode(NotebookNode):
 				not self.is_node_a_child(target)
 	
 	def delete(self):
+		if self._notebook is not None:
+			self._notebook.node_removed_listeners.notify(self)
 		for child in self._children:
 			child.delete()
 		if self.parent is not None:
@@ -598,6 +622,8 @@ class AbstractContentFolderNode(NotebookNode):
 		elif self.is_node_a_child(target):
 			raise IllegalOperationError('Cannot move a node to one of its children')
 		
+		old_parent = self.parent
+		
 		if behind is None:
 			target._children.append(self)
 		else:
@@ -610,6 +636,8 @@ class AbstractContentFolderNode(NotebookNode):
 		self.parent = target
 		
 		self.modified_time = datetime.now(tz=utc)
+		
+		self.notebook.node_moved_listeners.notify(self, old_parent=old_parent, new_parent=target)
 
 
 class ContentNode(AbstractContentFolderNode):
@@ -620,9 +648,6 @@ class ContentNode(AbstractContentFolderNode):
 	@ivar additional_payload_names: The names of the payloads of the node.
 	@ivar payloads
 	"""
-	
-	# Change constants
-	PAYLOAD_CHANGE = NotebookNode.StorageChange('PAYLOAD_CHANGE')
 	
 	# Idea: Use classmethods for loading from storage / for creating new in memory
 
@@ -660,8 +685,8 @@ class ContentNode(AbstractContentFolderNode):
 		@param title_color_foreground: See the class documentation.
 		@param title_color_background: See the class documentation.
 		@param client_preferences: See the class documentation.
-		@param main_payload: A ContentNodePayload object.
-		@param additional_payloads: A list containing ContentNodePayload objects.
+		@param main_payload: A NotebookNodePayload object.
+		@param additional_payloads: A list containing NotebookNodePayload objects.
 		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
@@ -701,7 +726,7 @@ class ContentNode(AbstractContentFolderNode):
 	def add_additional_payload(self, payload):
 		"""Adds an additional payload.
 		
-		@param payload: A ContentNodePayload object.
+		@param payload: A NotebookNodePayload object.
 		@raise PayloadAlreadyExistsError: If the node already has a payload with the same name.
 		"""
 		if payload.name == self.main_payload_name:
@@ -763,7 +788,7 @@ class ContentNode(AbstractContentFolderNode):
 		"""Returns a payload.
 		
 		@param payload_name: The name of the payload to add.
-		@return: A ContentNodePayload object.
+		@return: A NotebookNodePayload object.
 		@raise PayloadDoesNotExistError: If the node does not have a payload with the given name.
 		"""
 		if payload_name in self.payloads:

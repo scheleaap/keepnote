@@ -48,6 +48,9 @@ class NotebookTest(unittest.TestCase):
 				title=title,
 				)
 	
+	def setUp(self):
+		self._event_handler = Mock()
+	
 	def test_client_preferences(self):
 		"""Test the setting and getting of Notebook client preferences."""
 		
@@ -74,24 +77,53 @@ class NotebookTest(unittest.TestCase):
 		
 		notebook.close()
 		
-		handler.assert_has_calls([call.on_closing(), call.on_close()])
+		handler.assert_has_calls([call.on_closing(notebook), call.on_close(notebook)])
 	
-	@unittest.skip('TODO')
-	def test_node_changed_event(self):
+	def test_add_node_added_listener(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
 		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.node_changed_listeners.add(handler.on_node_change)
-		
-		self.fail('TODO');
+		notebook.node_added_listeners.add(handler.on_node_added)
 	
-	def get_client_event_listeners(self):
+	def test_add_node_removed_listener(self):
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		notebook_storage.get_all_nodes.return_value = []
+		handler = Mock()
+		
+		notebook = Notebook(notebook_storage)
+		notebook.node_removed_listeners.add(handler.on_node_removed)
+	
+	def test_add_node_moved_listener(self):
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		notebook_storage.get_all_nodes.return_value = []
+		handler = Mock()
+		
+		notebook = Notebook(notebook_storage)
+		notebook.node_moved_listeners.add(handler.on_node_moved)
+	
+	def test_add_node_changed_listener(self):
+		notebook_storage = Mock(spec=storage.NotebookStorage)
+		notebook_storage.get_all_nodes.return_value = []
+		handler = Mock()
+		
+		notebook = Notebook(notebook_storage)
+		notebook.node_changed_listeners.add(handler.on_node_changed)
+	
+	def add_client_event_listener(self):
 		handler = Mock()
 		
 		notebook = self._create_notebook()
 		notebook.get_client_event_listeners("my-event").add(handler.on_event)
+	
+	def test_set_root(self):
+		notebook = self._create_notebook()
+		
+		with self.assertRaises(Exception):
+			notebook.root = TestNotebookNode()
+		
+		self.assertEqual(None, notebook.root)
 	
 	def test_has_node(self):
 		root = TestNotebookNode()
@@ -100,7 +132,7 @@ class NotebookTest(unittest.TestCase):
 		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
 		notebook = self._create_notebook()
-		notebook.root = root
+		notebook._root = root
 
 		self.assertEqual(True, notebook.has_node(root.node_id))
 		self.assertEqual(True, notebook.has_node(child1.node_id))
@@ -116,7 +148,7 @@ class NotebookTest(unittest.TestCase):
 		child12 = TestNotebookNode(parent=child1, add_to_parent=True)
 		child121 = TestNotebookNode(parent=child12, add_to_parent=True)
 		notebook = self._create_notebook()
-		notebook.root = root
+		notebook._root = root
 
 		self.assertEqual(root, notebook.get_node_by_id(root.node_id))
 		self.assertEqual(child1, notebook.get_node_by_id(child1.node_id))
@@ -161,6 +193,16 @@ class ContentFolderTrashNodeTestBase(object):
 			):
 		"""Creates a node of the class under test."""
 		raise NotImplementedError()
+	
+	def setUp(self):
+		self._notebook = self._create_notebook()
+		self._event_handler = Mock()
+		
+		# Register event handlers.
+		self._notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		self._notebook.node_removed_listeners.add(self._event_handler.on_node_removed)
+		self._notebook.node_moved_listeners.add(self._event_handler.on_node_moved)
+		self._notebook.node_changed_listeners.add(self._event_handler.on_node_changed)
 	
 	def test_create_new_n(self):
 		parent = TestNotebookNode()
@@ -295,7 +337,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_title_init_set_new(self):
 		"""Tests setting the title of a new node."""
-		node = self._create_node(title=DEFAULT_TITLE, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, title=DEFAULT_TITLE, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_TITLE, node.title)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -306,10 +348,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('new title', node.title)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
-	
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
+
 	def test_title_init_set_from_storage(self):
 		"""Tests setting the title of a node loaded from storage."""
-		node = self._create_node(title=DEFAULT_TITLE, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, title=DEFAULT_TITLE, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_TITLE, node.title)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -320,6 +363,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('new title', node.title)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_title_create_copy(self):
 		node = self._create_node(title=DEFAULT_TITLE, loaded_from_storage=False)
@@ -408,7 +452,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_icon_normal_init_set_new(self):
 		"""Tests setting the normal icon of a new node."""
-		node = self._create_node(icon_normal=DEFAULT_ICON_NORMAL, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, icon_normal=DEFAULT_ICON_NORMAL, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -419,10 +463,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.icon_normal)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_icon_normal_init_set_from_storage(self):
 		"""Tests setting the normal icon of a node loaded from storage."""
-		node = self._create_node(icon_normal=DEFAULT_ICON_NORMAL, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, icon_normal=DEFAULT_ICON_NORMAL, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_ICON_NORMAL, node.icon_normal)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -433,6 +478,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.icon_normal)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_icon_normal_create_copy(self):
 		node = self._create_node(icon_normal=DEFAULT_ICON_NORMAL, loaded_from_storage=False)
@@ -443,7 +489,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_icon_open_init_set_new(self):
 		"""Tests setting the open icon of a new node."""
-		node = self._create_node(icon_open=DEFAULT_ICON_OPEN, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, icon_open=DEFAULT_ICON_OPEN, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -454,10 +500,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.icon_open)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_icon_open_init_set_from_storage(self):
 		"""Tests setting the open icon of a node loaded from storage."""
-		node = self._create_node(icon_open=DEFAULT_ICON_OPEN, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, icon_open=DEFAULT_ICON_OPEN, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_ICON_OPEN, node.icon_open)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -468,6 +515,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.icon_open)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_icon_open_create_copy(self):
 		node = self._create_node(icon_open=DEFAULT_ICON_OPEN, loaded_from_storage=False)
@@ -478,7 +526,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_title_color_foreground_init_set_new(self):
 		"""Tests setting the title foreground color of a new node."""
-		node = self._create_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -489,10 +537,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('#c0c0c0', node.title_color_foreground)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_title_color_foreground_init_set_from_storage(self):
 		"""Tests setting the title foreground of a node loaded from storage."""
-		node = self._create_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_TITLE_COLOR_FOREGROUND, node.title_color_foreground)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -503,6 +552,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('#c0c0c0', node.title_color_foreground)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_title_color_foreground_create_copy(self):
 		node = self._create_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, loaded_from_storage=False)
@@ -513,7 +563,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_title_color_background_init_set_new(self):
 		"""Tests setting the title background color of a new node."""
-		node = self._create_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -524,10 +574,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.title_color_background)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_title_color_background_init_set_from_storage(self):
 		"""Tests setting the title background color of a node loaded from storage."""
-		node = self._create_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_TITLE_COLOR_BACKGROUND, node.title_color_background)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -538,6 +589,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('icon_new.png', node.title_color_background)
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_title_color_background_create_copy(self):
 		node = self._create_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, loaded_from_storage=False)
@@ -548,7 +600,7 @@ class ContentFolderTrashNodeTestBase(object):
 	
 	def test_client_preferences_init_set_new(self):
 		"""Tests setting the client preferences of a new node."""
-		node = self._create_node(client_preferences=DEFAULT_CLIENT_PREFERENCES, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, client_preferences=DEFAULT_CLIENT_PREFERENCES, loaded_from_storage=False)
 		self.assertEqual(DEFAULT_CLIENT_PREFERENCES, node.client_preferences._data)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -560,10 +612,11 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('new value', node.client_preferences.get('test', 'key'))
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
-	def test_client_preferences_set_from_storage(self):
+	def test_client_preferences_init_set_from_storage(self):
 		"""Tests setting the client preferences of a node loaded from storage."""
-		node = self._create_node(client_preferences=DEFAULT_CLIENT_PREFERENCES, loaded_from_storage=True)
+		node = self._create_node(notebook=self._notebook, client_preferences=DEFAULT_CLIENT_PREFERENCES, loaded_from_storage=True)
 		self.assertEqual(DEFAULT_CLIENT_PREFERENCES, node.client_preferences._data)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
@@ -575,6 +628,7 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual('new value', node.client_preferences.get('test', 'key'))
 # 		self.assertEqual(True, node.is_dirty)
 		self.assertEqual(True, node.modified_time > old_modified_time)
+		self._event_handler.assert_has_calls([call.on_node_changed(node)])
 	
 	def test_client_preferences_create_copy(self):
 		node = self._create_node(client_preferences=DEFAULT_CLIENT_PREFERENCES, loaded_from_storage=False)
@@ -595,7 +649,7 @@ class ContentFolderTrashNodeTestBase(object):
 		assert_that(copy.is_dirty, equal_to(True))
 	
 	def test_create_copy_with_subtree(self):
-		node = self._create_node(parent=None, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, parent=None, loaded_from_storage=False)
 		child1_copy = TestNotebookNode()
 		child1 = TestNotebookNode()
 		child1.set_create_copy_result(child1_copy)
@@ -608,8 +662,9 @@ class ContentFolderTrashNodeTestBase(object):
 		copy = node.create_copy(with_subtree=True)
 		
 		assert_that(copy.children), contains(child1_copy, child2_copy)
+		self._event_handler.assert_has_calls([])
 
-	
+
 class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	def test_is_trash(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
@@ -648,8 +703,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(False, node.is_in_trash)
 	
 	def test_title_set_if_deleted(self):
-		parent = TestNotebookNode()
-		node = self._create_node(parent=parent, title=DEFAULT_TITLE, loaded_from_storage=False)
+		parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=parent, title=DEFAULT_TITLE, loaded_from_storage=False)
 		node.delete()
 		
 		with self.assertRaises(IllegalOperationError):
@@ -665,8 +720,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(copy.content_type, equal_to(node.content_type))
 	
 	def test_add_new_node_as_child(self):
-		notebook = self._create_notebook()
-		node = self._create_node(notebook=notebook, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, loaded_from_storage=False)
 		child = TestNotebookNode(notebook=None, parent=None)
 		
 		assert_that(node.can_add_new_node_as_child(), is_(True))
@@ -676,6 +730,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(node.children, contains(child))
 		assert_that(child._notebook, is_(same_instance(node._notebook)))
 		assert_that(child.parent, is_(same_instance(node)))
+		self._event_handler.assert_has_calls([call.on_node_added(child, parent=node)])
 	
 	def test_add_new_node_as_child_child_notebook_not_none(self):
 		notebook = self._create_notebook()
@@ -703,8 +758,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(same_instance(other_parent)))
 	
 	def test_add_new_node_as_child_child_deleted(self):
-		notebook = self._create_notebook()
-		node = self._create_node(notebook=notebook, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, loaded_from_storage=False)
 		child = TestNotebookNode()
 		child.delete()
 		
@@ -766,8 +820,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_delete_without_children(self):
-		parent = TestNotebookNode()
-		node = self._create_node(parent=parent, loaded_from_storage=True)
+		parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=parent, loaded_from_storage=True)
 		
 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
@@ -779,13 +833,16 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(True, node.is_deleted)
 		self.assertEqual(False, node in parent.children)
 		self.assertEqual(False, node in parent.get_children())
+		self._event_handler.assert_has_calls([call.on_node_removed(node)])
 	
 	def test_delete_with_children(self):
-		parent = TestNotebookNode()
-		node = self._create_node(parent=parent, loaded_from_storage=True)
+		parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=parent, loaded_from_storage=True)
 		child1 = Mock(spec=NotebookNode)
+		child1.notebook = notebook=self._notebook
 		child1.parent = node
 		child2 = Mock(spec=NotebookNode)
+		child2.notebook = notebook=self._notebook
 		child2.parent = node
 		node._add_child_node(child1)
 		node._add_child_node(child2)
@@ -795,6 +852,7 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		child1.delete.assert_called_with()
 		child2.delete.assert_called_with()
 # TODO: Nodig?		self.assertEqual([], node.children)
+		self._event_handler.assert_has_calls([call.on_node_removed(node)])
 	
 	def test_delete_child_fails(self):
 		parent = TestNotebookNode()
@@ -810,14 +868,14 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
 		self.assertEqual(True, node in parent.children)
+		self._event_handler.assert_has_calls([])
 	
 	def test_move(self):
 		"""Tests moving a node."""
-		
 		# Create the node and parents.
-		old_parent = TestNotebookNode()
-		new_parent = TestNotebookNode()
-		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		old_parent = TestNotebookNode(notebook=self._notebook)
+		new_parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
 		
@@ -833,16 +891,20 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(True, node.modified_time > old_modified_time)
 		self.assertEqual([], old_parent.children)
 		self.assertEqual([node], new_parent.children)
+		
+		# Verify an event was raised.
+		# TODO: Zorg dat er geen andere calls zijn
+		self._event_handler.assert_has_calls([call.on_node_moved(node, old_parent=old_parent, new_parent=new_parent)])
 	
 	def test_move_behind_sibling(self):
 		"""Tests moving a node behind a sibling."""
 		
 		# Create the node and parents.
-		old_parent = TestNotebookNode()
-		new_parent = TestNotebookNode()
-		child1 = TestNotebookNode(parent=new_parent, add_to_parent=True)
-		child2 = TestNotebookNode(parent=new_parent, add_to_parent=True)
-		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		old_parent = TestNotebookNode(notebook=self._notebook)
+		new_parent = TestNotebookNode(notebook=self._notebook)
+		child1 = TestNotebookNode(notebook=self._notebook, parent=new_parent, add_to_parent=True)
+		child2 = TestNotebookNode(notebook=self._notebook, parent=new_parent, add_to_parent=True)
+		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
 		
 		# Move the node.
 		node.move(new_parent, behind=child1)
@@ -852,9 +914,9 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	
 	def test_move_behind_nonexistent_sibling(self):
 		# Create the node and parents.
-		old_parent = TestNotebookNode()
-		new_parent = TestNotebookNode()
-		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		old_parent = TestNotebookNode(notebook=self._notebook)
+		new_parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
 		
 		with self.assertRaises(IllegalOperationError):
 			# Move the node.
@@ -864,13 +926,16 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual([node], old_parent.children)
 		self.assertEqual([], new_parent.children)
+		
+		# Verify no event was raised.
+		self._event_handler.assert_has_calls([])
 	
 	def test_move_if_deleted(self):
 		"""Tests moving a node if it is deleted."""
 		
-		old_parent = TestNotebookNode()
-		new_parent = TestNotebookNode()
-		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		old_parent = TestNotebookNode(notebook=self._notebook)
+		new_parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
 		node.delete()
 		
 		# Verify the node.
@@ -882,13 +947,16 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		
 		# Verify the parent.
 		self.assertEqual([], new_parent.children)
+		
+		# Verify no event was raised.
+		self._event_handler.assert_has_calls([])
 	
 	def test_move_root(self):
 		"""Tests moving a node if it is the root."""
 		
 		# Create the node and parents.
-		new_parent = TestNotebookNode()
-		node = self._create_node(parent=None, loaded_from_storage=True)
+		new_parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=None, loaded_from_storage=True)
 		
 		# Verify the node.
 		self.assertEqual(False, node.can_move(new_parent))
@@ -900,15 +968,18 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		# Verify the node and the parent.
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual([], new_parent.children)
+		
+		# Verify no event was raised.
+		self._event_handler.assert_has_calls([])
 	
 	def test_move_to_child(self):
 		"""Tests moving a node to one of its children."""
 		
 		# Create the node and parents.
-		old_parent = TestNotebookNode()
-		node = self._create_node(parent=old_parent, loaded_from_storage=True)
-		child1 = TestNotebookNode(parent=node, add_to_parent=True)
-		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
+		old_parent = TestNotebookNode(notebook=self._notebook)
+		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
+		child1 = TestNotebookNode(notebook=self._notebook, parent=node, add_to_parent=True)
+		child11 = TestNotebookNode(notebook=self._notebook, parent=child1, add_to_parent=True)
 		new_parent = child11
 		
 		# Verify the node.
@@ -922,6 +993,9 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual([node], old_parent.children)
 		self.assertEqual([], new_parent.children)
+		
+		# Verify no event was raised.
+		self._event_handler.assert_has_calls([])
 	
 	def test_move_to_different_notebook(self):
 		"""Tests moving a node to another notebook."""
@@ -949,9 +1023,12 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 # 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual([node], old_parent.children)
 		self.assertEqual([], new_parent.children)
-	
+		
+		# Verify no event was raised.
+		self._event_handler.assert_has_calls([])
 
-class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
+
+class ContentNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 	def _create_node(
 			self,
 			notebook=None,
@@ -1121,7 +1198,7 @@ class ContentNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		
 # 		self.assertEqual(False, node.is_dirty)
 
-class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
+class FolderNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 	def _create_node(
 			self,
 			notebook=None,
@@ -1174,7 +1251,7 @@ class FolderNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 		return node
 
 
-class TrashNodeTest(unittest.TestCase, ContentFolderTrashNodeTestBase):
+class TrashNodeTest(ContentFolderTrashNodeTestBase, unittest.TestCase):
 	def _create_node(
 			self,
 			notebook=None,
