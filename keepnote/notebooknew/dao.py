@@ -209,7 +209,7 @@ class Dao(object):
 			else:
 				if self._notebook.root is not None:
 					raise InvalidStructureError('Multiple root nodes found')
-				self._notebook.root = notebook_node
+				self._notebook.add_new_node_as_root(notebook_node)
 			if notebook_node.content_type == CONTENT_TYPE_TRASH:
 				self._notebook.trash = notebook_node
 # 		
@@ -254,7 +254,7 @@ class Dao(object):
 	def _convert_sn_to_nn(self, sn):
 		for node_dao in self._node_daos:
 			if node_dao.accepts(sn.content_type):
-				nn = node_dao.sn_to_nn(sn, self._notebook_storage, self._notebook)
+				nn = node_dao.sn_to_nn(sn, notebook_storage=self._notebook_storage, notebook=None)
 				return nn
 		raise StoredNodeConversionError('There is no node DAO that accepts the content type {content_type}'.format(
 				content_type=sn.content_type))

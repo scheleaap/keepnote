@@ -325,7 +325,7 @@ class StructureTest(unittest.TestCase):
 	def test_new_in_local_only_root(self):
 		root_nn = TestNotebookNode()
 		notebook = Notebook()
-		notebook.root = root_nn
+		notebook.add_new_node_as_root(root_nn)
 		notebook_storage = storage.mem.InMemoryStorage()
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), TrashNodeDao() ])
 
@@ -345,7 +345,7 @@ class StructureTest(unittest.TestCase):
 		child2_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
 		child21_nn = TestNotebookNode(parent=child2_nn, add_to_parent=True)
 		notebook = Notebook()
-		notebook.root = root_nn
+		notebook.add_new_node_as_root(root_nn)
 		notebook_storage = storage.mem.InMemoryStorage()
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 
@@ -375,7 +375,7 @@ class StructureTest(unittest.TestCase):
 		_child11_nn = TestNotebookNode(parent=child1_nn, add_to_parent=True)
 		_child2_nn = TestNotebookNode(parent=root_nn, add_to_parent=True)
 		notebook = Notebook()
-		notebook.root = root_nn
+		notebook.add_new_node_as_root(root_nn)
 		notebook_storage = storage.mem.InMemoryStorage()
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao() ])
 		dao.sync()
@@ -469,8 +469,8 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		notebook_storage.read_only = True
@@ -497,7 +497,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -521,7 +521,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -549,7 +549,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title=DEFAULT_TITLE, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -561,7 +561,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title=DEFAULT_TITLE, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -604,7 +604,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -632,7 +632,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -644,7 +644,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -674,7 +674,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(icon_normal=DEFAULT_ICON_NORMAL, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -686,7 +686,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(icon_normal=DEFAULT_ICON_NORMAL, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -716,7 +716,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(icon_open=DEFAULT_ICON_OPEN, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -728,7 +728,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(icon_open=DEFAULT_ICON_OPEN, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -758,7 +758,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -770,7 +770,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title_color_foreground=DEFAULT_TITLE_COLOR_FOREGROUND, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -800,7 +800,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -812,7 +812,7 @@ class ContentFolderTrashNodeTest(object):
 		node = self._create_notebook_node(title_color_background=DEFAULT_TITLE_COLOR_BACKGROUND, parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -844,7 +844,7 @@ class ContentFolderTrashNodeTest(object):
 		node.client_preferences.set('test', 'key', 'value')
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
@@ -858,7 +858,7 @@ class ContentFolderTrashNodeTest(object):
 		node.client_preferences.set('test', 'key', 'value')
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -892,7 +892,7 @@ class ContentFolderNodeTest(ContentFolderTrashNodeTest):
 		node = self._create_notebook_node(parent=root, add_to_parent=True)
 		notebook_storage = storage.mem.InMemoryStorage()
 		notebook = Notebook()
-		notebook.root = node
+		notebook.add_new_node_as_root(root)
 		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
@@ -1129,8 +1129,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -1151,8 +1151,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		with node.payloads[DEFAULT_HTML_PAYLOAD_NAME].open('w') as f:
@@ -1195,8 +1195,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		
 		dao.sync()
 		
@@ -1219,8 +1219,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.add_additional_payload(TestPayload(DEFAULT_PNG_PAYLOAD_NAME, DEFAULT_PNG_PAYLOAD_DATA))
@@ -1243,8 +1243,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		with node.payloads[DEFAULT_PNG_PAYLOAD_NAME].open('w') as f:
@@ -1267,8 +1267,8 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 				parent=root, add_to_parent=True)
 		notebook_storage = ReadOnlyInMemoryStorage(storage.mem.InMemoryStorage(), read_only=False)
 		notebook = Notebook()
-		notebook.root = node
-		dao = Dao(notebook, notebook_storage, [ self._get_class_dao() ])
+		notebook.add_new_node_as_root(root)
+		dao = Dao(notebook, notebook_storage, [ TestNotebookNodeDao(), self._get_class_dao() ])
 		dao.sync()
 		
 		node.remove_additional_payload(DEFAULT_PNG_PAYLOAD_NAME)

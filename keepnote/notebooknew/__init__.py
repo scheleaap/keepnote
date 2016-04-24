@@ -146,9 +146,9 @@ class Notebook(object):
 		@raise ValueError: If the node's notebook or parent are not None.
 		"""
 		if node._notebook is not None:
-			raise ValueError('Trying to add a node as a child that has a notebook')
+			raise ValueError('Trying to add a node as the root of the notebook that already has a notebook')
 		if node.parent is not None:
-			raise ValueError('Trying to add a node as a child that has a parent')
+			raise ValueError('Trying to add a node as the root of the notebook that has a parent')
 		self._root = node
 		node._notebook = self
 	
@@ -415,7 +415,8 @@ class NotebookNode(object):
 		
 		self._icon_normal = icon_normal
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def icon_open(self):
@@ -428,7 +429,8 @@ class NotebookNode(object):
 		
 		self._icon_open = icon_open
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 	
 	def is_node_a_child(self, node):
 		"""Returns whether another node is a child of this node."""
@@ -493,7 +495,8 @@ class NotebookNode(object):
 	
 	def _on_client_preferences_change(self):
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 	
 	def _remove_child_node(self, child_node):
 		assert child_node in self._children
@@ -510,7 +513,8 @@ class NotebookNode(object):
 		
 		self._title = title
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def title_color_background(self):
@@ -523,7 +527,8 @@ class NotebookNode(object):
 		
 		self._title_color_background = title_color_background
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 	
 	@property
 	def title_color_foreground(self):
@@ -536,7 +541,8 @@ class NotebookNode(object):
 		
 		self._title_color_foreground = title_color_foreground
 		self.modified_time = datetime.now(tz=utc)
-		self._notebook.node_changed_listeners.notify(self)
+		if self._notebook is not None:
+			self._notebook.node_changed_listeners.notify(self)
 
 
 class NotebookNodePayload(object):
@@ -676,7 +682,8 @@ class AbstractContentFolderNode(NotebookNode):
 		
 		self.modified_time = datetime.now(tz=utc)
 		
-		self.notebook.node_moved_listeners.notify(self, old_parent=old_parent, new_parent=target)
+		if self._notebook is not None:
+			self.notebook.node_moved_listeners.notify(self, old_parent=old_parent, new_parent=target)
 
 
 class ContentNode(AbstractContentFolderNode):
