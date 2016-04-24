@@ -69,53 +69,45 @@ class NotebookTest(unittest.TestCase):
 		self.assertEqual(expected, notebook.client_preferences)
 	
 	def test_close_without_changes(self):
-		handler = Mock()
-		
 		notebook = self._create_notebook()
-		notebook.closing_listeners.add(handler.on_closing)
-		notebook.close_listeners.add(handler.on_close)
+		notebook.closing_listeners.add(self._event_handler.on_closing)
+		notebook.close_listeners.add(self._event_handler.on_close)
 		
 		notebook.close()
 		
-		handler.assert_has_calls([call.on_closing(notebook), call.on_close(notebook)])
+		self._event_handler.assert_has_calls([call.on_closing(notebook), call.on_close(notebook)])
 	
 	def test_add_node_added_listener(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
-		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.node_added_listeners.add(handler.on_node_added)
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
 	
 	def test_add_node_removed_listener(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
-		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.node_removed_listeners.add(handler.on_node_removed)
+		notebook.node_removed_listeners.add(self._event_handler.on_node_removed)
 	
 	def test_add_node_moved_listener(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
-		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.node_moved_listeners.add(handler.on_node_moved)
+		notebook.node_moved_listeners.add(self._event_handler.on_node_moved)
 	
 	def test_add_node_changed_listener(self):
 		notebook_storage = Mock(spec=storage.NotebookStorage)
 		notebook_storage.get_all_nodes.return_value = []
-		handler = Mock()
 		
 		notebook = Notebook(notebook_storage)
-		notebook.node_changed_listeners.add(handler.on_node_changed)
+		notebook.node_changed_listeners.add(self._event_handler.on_node_changed)
 	
 	def add_client_event_listener(self):
-		handler = Mock()
-		
 		notebook = self._create_notebook()
-		notebook.get_client_event_listeners("my-event").add(handler.on_event)
+		notebook.get_client_event_listeners("my-event").add(self._event_handler.on_event)
 	
 	def test_set_root(self):
 		notebook = self._create_notebook()
@@ -124,6 +116,74 @@ class NotebookTest(unittest.TestCase):
 			notebook.root = TestNotebookNode()
 		
 		self.assertEqual(None, notebook.root)
+	
+	def test_add_new_node_as_root(self):
+		notebook = self._create_notebook()
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		node = TestNotebookNode(notebook=None, parent=None)
+		
+		assert_that(notebook.can_add_new_node_as_root(), is_(True))
+		
+		notebook.add_new_node_as_root(node)
+		
+		assert_that(notebook.root, is_(same_instance(node)))
+		assert_that(node._notebook, is_(same_instance(notebook)))
+		assert_that(node.parent, is_(none()))
+		self._event_handler.assert_has_calls([call.on_node_added(node, parent=None)])
+	
+	def test_add_new_node_as_root_node_notebook_not_none(self):
+		notebook = self._create_notebook()
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		node = TestNotebookNode(notebook=notebook, parent=None)
+		
+		with self.assertRaises(Exception):
+			notebook.add_new_node_as_root(node)
+		
+		assert_that(notebook.root, is_(none()))
+		assert_that(node._notebook, is_(same_instance(notebook)))
+		assert_that(node.parent, is_(none()))
+	
+	def test_add_new_node_as_root_node_parent_not_none(self):
+		notebook = self._create_notebook()
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		other_parent = TestNotebookNode()
+		node = TestNotebookNode(parent=other_parent, add_to_parent=True)
+		
+		with self.assertRaises(Exception):
+			notebook.add_new_node_as_root(node)
+		
+		assert_that(notebook.root, is_(none()))
+		assert_that(node._notebook, is_(none()))
+		assert_that(node.parent, is_(same_instance(other_parent)))
+	
+	def test_add_new_node_as_root_node_deleted(self):
+		notebook = self._create_notebook()
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		node = TestNotebookNode()
+		node.delete()
+		
+		with self.assertRaises(Exception):
+			notebook.add_new_node_as_root(node)
+		
+		assert_that(notebook.root, is_(none()))
+		assert_that(node._notebook, is_(none()))
+		assert_that(node.parent, is_(none()))
+	
+	def test_add_new_node_as_root_root_already_present(self):
+		notebook = self._create_notebook()
+		notebook.node_added_listeners.add(self._event_handler.on_node_added)
+		node1 = TestNotebookNode()
+		node2 = TestNotebookNode()
+		notebook.add_new_node_as_root(node1)
+		
+		assert_that(notebook.can_add_new_node_as_root(), is_(False))
+		
+		with self.assertRaises(Exception):
+			notebook.add_new_node_as_root(node2)
+		
+		assert_that(notebook.root, is_(same_instance(node1)))
+		assert_that(node1._notebook, is_(same_instance(notebook)))
+		assert_that(node2._notebook, is_(none()))
 	
 	def test_has_node(self):
 		root = TestNotebookNode()

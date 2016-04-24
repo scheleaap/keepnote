@@ -117,6 +117,45 @@ class Notebook(object):
 		self.close_listeners = Listeners()
 		self._client_event_listeners = {}
 	
+	def add_new_node_as_root(self, node):
+		"""Adds a new node as the root of the notebook.
+		
+		The new node must not have a notebook and a parent.
+		
+		This method may only be called if this node is not deleted and is not in the trash. 
+		
+		@param node: The node to add as the root.
+		@raise ValueError: If the node's notebook or parent are not None.
+		@raise IllegalOperationError: If the node on which this method is called is deleted or is in the trash.
+		"""
+		if node.is_deleted:
+			raise IllegalOperationError('Trying to add a deleted node as a child')
+		if self._root is not None:
+			raise IllegalOperationError('The notebook already has a root node')
+		
+		self._add_unbound_node_as_root(node)
+		
+		self.node_added_listeners.notify(node, parent=None)
+	
+	def _add_unbound_node_as_root(self, node):
+		"""Adds a node as the root of the notebook.
+		
+		The new node must not have a notebook and a parent.
+		
+		@param node: The node to add as the root. The node's notebook and parent must be unset.
+		@raise ValueError: If the node's notebook or parent are not None.
+		"""
+		if node._notebook is not None:
+			raise ValueError('Trying to add a node as a child that has a notebook')
+		if node.parent is not None:
+			raise ValueError('Trying to add a node as a child that has a parent')
+		self._root = node
+		node._notebook = self
+	
+	def can_add_new_node_as_root(self):
+		"""Returns whether a new node can be added as the root of the notebook."""
+		return self._root is None
+	
 	def close(self):
 		self.closing_listeners.notify(self)
 		self.close_listeners.notify(self)
