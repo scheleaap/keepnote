@@ -90,12 +90,12 @@ class Notebook(object):
 	"""A collection of nodes.
 	
 	@ivar root: The root NotebookNode.
-	@ivar trash: TODO
+	@ivar trash: The trash node, a TrashNode instance.
 	@ivar title: The title of the notebook.
-	@ivar client_preferences: A Pref containing the notebook's client preferences.
-	@ivar node_changed_listeners: TODO
-	@ivar closing_listeners: TODO
-	@ivar close_listeners: TODO
+	@ivar client_preferences: A Pref instance containing the notebook's client preferences.
+	@ivar node_changed_listeners: A Listeners instance containing the listeners to be notified when a node changes.
+	@ivar closing_listeners: A listeners instance containing the listeners to be notified when the notebook is going to close.
+	@ivar close_listeners: A listeners instance containing the listeners to be notified just before the notebook closes.
 	@ivar is_dirty: TODO
 	"""
 	
@@ -168,20 +168,20 @@ class Notebook(object):
 class NotebookNode(object):
 	"""A node in a notebook. Every node has an identifier, a content type and a title.
 	
-	@ivar notebook: TODO
+	@ivar notebook: The Notebook the node is in.
 	@ivar node_id: The id of the node.
 	@ivar children: The node's children.
 	@ivar content_type: The content type of the node.
 	@ivar parent: The parent of the node.
 	@ivar title: The title of the node.
-	@ivar created_time: TODO
-	@ivar modified_time: TODO
+	@ivar created_time: The time at which the node was created (datetime instance)
+	@ivar modified_time: The time at which the node was last modified (datetime instance in utc)
 	@ivar order: TODO
-	@ivar icon_normal: TODO
-	@ivar icon_open: TODO
-	@ivar title_color_foreground: TODO
-	@ivar title_color_background: TODO
-	@ivar client_preferences: TODO
+	@ivar icon_normal: The icon to be displayed in normal situations.
+	@ivar icon_open: The icon to be displayed when the node is open.
+	@ivar title_color_foreground: The foreground color to use when displaying the title.
+	@ivar title_color_background: The background color to use when displaying the title.
+	@ivar client_preferences: A Pref instance containing the notebook's client preferences.
 	@ivar is_dirty: Indicates whether the node has changed since it was last saved.
 	@ivar is_deleted: Indicates whether the node has been deleted from the notebook.
 	"""
@@ -225,17 +225,17 @@ class NotebookNode(object):
 			):
 		"""Constructor.
 		
-		@param notebook: The notebook the node is in.
-		@param content_type: The content type of node.
-		@param parent: The parent of the node or None.
-		@param loaded_from_storage: TODO
-		@param title: The title of the node.
-		@param order: TODO
-		@param icon_normal: TODO
-		@param icon_open: TODO
-		@param title_color_foreground: TODO
-		@param title_color_background: TODO
-		@param client_preferences: TODO
+		@param notebook: See the class documentation.
+		@param content_type: See the class documentation.
+		@param parent: See the class documentation.
+		@param loaded_from_storage: Indicates whether the node was loaded from storage (True) or if it is new (False).
+		@param title: See the class documentation.
+		@param order: See the class documentation.
+		@param icon_normal: See the class documentation.
+		@param icon_open: See the class documentation.
+		@param title_color_foreground: See the class documentation.
+		@param title_color_background: See the class documentation.
+		@param client_preferences: See the class documentation.
 		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
@@ -291,7 +291,7 @@ class NotebookNode(object):
 		@raise ValueError: If the child node's notebook or parent are not None.
 		@raise IllegalOperationError: If the node on which this method is called is deleted or is in the trash.
 		"""
-		raise NotImplementedError('TODO')
+		raise NotImplementedError(self.add_new_node_as_child.__name__)
 	
 	def _add_unbound_node_as_child(self, child_node):
 		"""Adds a node as a child of this node.
@@ -310,41 +310,50 @@ class NotebookNode(object):
 		child_node.parent = self
 	
 	def can_add_new_node_as_child(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether a new node can be added as a child of this node."""
+		raise NotImplementedError(self.can_add_new_node_as_child.__name__)
 	
-	def can_copy(self, target, with_subtree):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+# 	def can_copy(self, target, with_subtree):
+# 		"""Returns whether this node can be copied."""
+# 		raise NotImplementedError(self.can_copy.__name__)
 	
 	def can_delete(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether the node can be deleted."""
+		raise NotImplementedError(self.can_delete.__name__)
 	
 	def can_move(self, target):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether the node can be moved."""
+		raise NotImplementedError(self.can_move.__name__)
 	
 	@property
 	def children(self):
 		"""TODO"""
 		return self.get_children()
 	
-	def copy(self, target, with_subtree, behind=None):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+# 	def copy(self, target, with_subtree, behind=None):
+# 		"""TODO"""
+# 		raise NotImplementedError(self.copy.__name__)
 	
 	def create_copy(self, with_subtree):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Creates a copy of the node.
+		
+		@param with_subtree: Copy the node's children as well.
+		@return: A node of the same type as the original, with a new node id.
+		"""
+		raise NotImplementedError(self.create_copy.__name__)
 	
 	@property
 	def created_time(self):
 		return self._created_time
 	
 	def delete(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Deletes the node and its children.
+		
+		Afterwards, the node will not part of the parent's children and is_deleted will be set to True.
+		
+		@raise IllegalOperationError: If can_delete() returns True.
+		"""
+		raise NotImplementedError(self.delete.__name__)
 	
 	@property
 	def icon_normal(self):
@@ -371,30 +380,33 @@ class NotebookNode(object):
 		self.modified_time = datetime.now(tz=utc)
 	
 	def is_node_a_child(self, node):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether another node is a child of this node."""
+		raise NotImplementedError(self.is_node_a_child.__name__)
 	
 	@property
 	def is_in_trash(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether this node is in the trash.
+		
+		A node is in the trash if its parent or one of its parents' parents is a trash node.
+		"""
+		raise NotImplementedError(self.is_in_trash.__name__)
 	
 	@property
 	def is_root(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether this node is the notebook's root node."""
+		raise NotImplementedError(self.is_root.__name__)
 	
 	@property
 	def is_trash(self):
-		"""TODO"""
-		raise NotImplementedError('TODO')
+		"""Returns whether this node is a trash node."""
+		raise NotImplementedError(self.is_trash.__name__)
 	
 	def get_children(self):
-		"""TODO"""
+		"""Returns the node's children."""
 		return [child for child in self._children]
 	
 	def has_children(self):
-		"""TODO"""
+		"""Returns whether the node has children."""
 		return len(self.get_children()) > 0
 	
 	@property
@@ -411,11 +423,16 @@ class NotebookNode(object):
 		self._modified_time = modified_time
 	
 	def move(self, target, behind=None):
-		"""TODO
+		"""Moves the node to a new paretn.
+		
+		@param target: The node's new parent.
+		@param behind: A child of the target node behind which this node must be placed. If None, the node will be added as the last child.
 		
 		Cannot be used to move a node to another workbook. Use copy() for that instead.
+		
+		@raise IllegalOperationError: If can_move() returns True.
 		"""
-		raise NotImplementedError('TODO')
+		raise NotImplementedError(self.move.__name__)
 	
 	@property
 	def notebook(self):
@@ -521,15 +538,15 @@ class AbstractContentFolderNode(NotebookNode):
 		else:
 			return True
 	
-	def can_copy(self, target, with_subtree):
-		if self.is_deleted:
-			return False
-		elif target.is_trash or target.is_in_trash:
-			return False
-		elif with_subtree and self.is_node_a_child(target):
-			return False
-		else:
-			return True
+# 	def can_copy(self, target, with_subtree):
+# 		if self.is_deleted:
+# 			return False
+# 		elif target.is_trash or target.is_in_trash:
+# 			return False
+# 		elif with_subtree and self.is_node_a_child(target):
+# 			return False
+# 		else:
+# 			return True
 	
 	def can_delete(self):
 		return not self.is_root
@@ -542,7 +559,6 @@ class AbstractContentFolderNode(NotebookNode):
 				not self.is_node_a_child(target)
 	
 	def delete(self):
-		"""TODO"""
 		for child in self._children:
 			child.delete()
 		if self.parent is not None:
@@ -633,19 +649,20 @@ class ContentNode(AbstractContentFolderNode):
 		
 		Either main_payload and additional_payloads or main_payload_name and additional_payload_names must be passed.
 		
-		@param notebook: The notebook the node is in.
-		@param content_type: The content type of node.
-		@param parent: The parent of the node or None.
-		@param loaded_from_storage: TODO
+		@param notebook: See the class documentation.
+		@param content_type: See the class documentation.
+		@param parent: See the class documentation.
+		@param loaded_from_storage: Indicates whether the node was loaded from storage (True) or if it is new (False).
+		@param title: See the class documentation.
+		@param order: See the class documentation.
+		@param icon_normal: See the class documentation.
+		@param icon_open: See the class documentation.
+		@param title_color_foreground: See the class documentation.
+		@param title_color_background: See the class documentation.
+		@param client_preferences: See the class documentation.
 		@param main_payload: A ContentNodePayload object.
-		@param title: The title of the node.
-		@param order: TODO
-		@param icon_normal: TODO
-		@param icon_open: TODO
-		@param title_color_foreground: TODO
-		@param title_color_background: TODO
 		@param additional_payloads: A list containing ContentNodePayload objects.
-		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
@@ -697,27 +714,27 @@ class ContentNode(AbstractContentFolderNode):
 		
 		self.modified_time = datetime.now(tz=utc)
 	
-	def copy(self, target, with_subtree, behind=None):
-		if self.is_deleted:
-			raise IllegalOperationError('Cannot copy a deleted node')
-		elif target.is_trash or target.is_in_trash:
-			raise IllegalOperationError('Cannot copy a node to the trash')
-		elif with_subtree and self.is_node_a_child(target):
-			raise IllegalOperationError('Cannot copy a node with its children to a child')
-		
-		copy = target.new_content_child_node(
-				content_type=self.content_type,
-				title=self._title,
-				main_payload=self.payloads[self.main_payload_name].copy(),
-				additional_payloads=[self.payloads[additional_payload_name].copy() for additional_payload_name in self.additional_payload_names],
-				behind=behind
-				)
-		if with_subtree:
-			for child in self._children:
-				if not child.is_deleted:
-					child.copy(copy, with_subtree=with_subtree)
-		
-		return copy
+# 	def copy(self, target, with_subtree, behind=None):
+# 		if self.is_deleted:
+# 			raise IllegalOperationError('Cannot copy a deleted node')
+# 		elif target.is_trash or target.is_in_trash:
+# 			raise IllegalOperationError('Cannot copy a node to the trash')
+# 		elif with_subtree and self.is_node_a_child(target):
+# 			raise IllegalOperationError('Cannot copy a node with its children to a child')
+# 		
+# 		copy = target.new_content_child_node(
+# 				content_type=self.content_type,
+# 				title=self._title,
+# 				main_payload=self.payloads[self.main_payload_name].copy(),
+# 				additional_payloads=[self.payloads[additional_payload_name].copy() for additional_payload_name in self.additional_payload_names],
+# 				behind=behind
+# 				)
+# 		if with_subtree:
+# 			for child in self._children:
+# 				if not child.is_deleted:
+# 					child.copy(copy, with_subtree=with_subtree)
+# 		
+# 		return copy
 	
 	def create_copy(self, with_subtree):
 		copy = ContentNode(
@@ -797,16 +814,17 @@ class FolderNode(AbstractContentFolderNode):
 			):
 		"""Constructor.
 		
-		@param notebook: The notebook the node is in.
-		@param parent: The parent of the node or None.
-		@param loaded_from_storage: TODO
-		@param title: The title of the node.
-		@param order: TODO
-		@param icon_normal: TODO
-		@param icon_open: TODO
-		@param title_color_foreground: TODO
-		@param title_color_background: TODO
-		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param notebook: See the class documentation.
+		@param parent: See the class documentation.
+		@param loaded_from_storage: Indicates whether the node was loaded from storage (True) or if it is new (False).
+		@param title: See the class documentation.
+		@param order: See the class documentation.
+		@param icon_normal: See the class documentation.
+		@param icon_open: See the class documentation.
+		@param title_color_foreground: See the class documentation.
+		@param title_color_background: See the class documentation.
+		@param client_preferences: See the class documentation.
+		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
@@ -827,24 +845,24 @@ class FolderNode(AbstractContentFolderNode):
 				modified_time=modified_time,
 				)
 	
-	def copy(self, target, with_subtree, behind=None):
-		if self.is_deleted:
-			raise IllegalOperationError('Cannot copy a deleted node')
-		elif target.is_trash or target.is_in_trash:
-			raise IllegalOperationError('Cannot copy a node to the trash')
-		elif with_subtree and self.is_node_a_child(target):
-			raise IllegalOperationError('Cannot copy a node with its children to a child')
-		
-		copy = target.new_folder_child_node(
-				title=self._title,
-				behind=behind
-				)
-		if with_subtree:
-			for child in self._children:
-				if not child.is_deleted:
-					child.copy(copy, with_subtree=with_subtree)
-		
-		return copy
+# 	def copy(self, target, with_subtree, behind=None):
+# 		if self.is_deleted:
+# 			raise IllegalOperationError('Cannot copy a deleted node')
+# 		elif target.is_trash or target.is_in_trash:
+# 			raise IllegalOperationError('Cannot copy a node to the trash')
+# 		elif with_subtree and self.is_node_a_child(target):
+# 			raise IllegalOperationError('Cannot copy a node with its children to a child')
+# 		
+# 		copy = target.new_folder_child_node(
+# 				title=self._title,
+# 				behind=behind
+# 				)
+# 		if with_subtree:
+# 			for child in self._children:
+# 				if not child.is_deleted:
+# 					child.copy(copy, with_subtree=with_subtree)
+# 		
+# 		return copy
 	
 	def create_copy(self, with_subtree):
 		copy = FolderNode(
@@ -894,16 +912,17 @@ class TrashNode(NotebookNode):
 			):
 		"""Constructor.
 		
-		@param notebook: The notebook the node is in.
-		@param parent: The parent of the node or None.
-		@param loaded_from_storage: TODO
-		@param title: The title of the node.
-		@param order: TODO
-		@param icon_normal: TODO
-		@param icon_open: TODO
-		@param title_color_foreground: TODO
-		@param title_color_background: TODO
-		@param node_id: The id of the node. Only if loaded_from_storage == True.
+		@param notebook: See the class documentation.
+		@param parent: See the class documentation.
+		@param loaded_from_storage: Indicates whether the node was loaded from storage (True) or if it is new (False).
+		@param title: See the class documentation.
+		@param order: See the class documentation.
+		@param icon_normal: See the class documentation.
+		@param icon_open: See the class documentation.
+		@param title_color_foreground: See the class documentation.
+		@param title_color_background: See the class documentation.
+		@param client_preferences: See the class documentation.
+		@param node_id: The id of the new node. Only if loaded_from_storage == True.
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
@@ -930,13 +949,13 @@ class TrashNode(NotebookNode):
 	def can_add_new_node_as_child(self):
 		return False
 	
-	def can_copy(self, target, with_subtree):
-		if target.is_trash or target.is_in_trash:
-			return False
-		elif self.is_node_a_child(target):
-			return False
-		else:
-			return True
+# 	def can_copy(self, target, with_subtree):
+# 		if target.is_trash or target.is_in_trash:
+# 			return False
+# 		elif self.is_node_a_child(target):
+# 			return False
+# 		else:
+# 			return True
 	
 	def can_delete(self):
 		return False
@@ -944,24 +963,24 @@ class TrashNode(NotebookNode):
 	def can_move(self, target):
 		return False
 	
-	def copy(self, target, with_subtree, behind=None):
-		if self.is_deleted:
-			raise IllegalOperationError('Cannot copy a deleted node')
-		elif target.is_trash or target.is_in_trash:
-			raise IllegalOperationError('Cannot copy a node to the trash')
-		elif self.is_node_a_child(target):
-			raise IllegalOperationError('Cannot copy the trash node to a child')
-		
-		copy = target.new_folder_child_node(
-				title=self._title,
-				behind=behind
-				)
-		if with_subtree:
-			for child in self._children:
-				if not child.is_deleted:
-					child.copy(copy, with_subtree=with_subtree)
-		
-		return copy
+# 	def copy(self, target, with_subtree, behind=None):
+# 		if self.is_deleted:
+# 			raise IllegalOperationError('Cannot copy a deleted node')
+# 		elif target.is_trash or target.is_in_trash:
+# 			raise IllegalOperationError('Cannot copy a node to the trash')
+# 		elif self.is_node_a_child(target):
+# 			raise IllegalOperationError('Cannot copy the trash node to a child')
+# 		
+# 		copy = target.new_folder_child_node(
+# 				title=self._title,
+# 				behind=behind
+# 				)
+# 		if with_subtree:
+# 			for child in self._children:
+# 				if not child.is_deleted:
+# 					child.copy(copy, with_subtree=with_subtree)
+# 		
+# 		return copy
 	
 	def create_copy(self, with_subtree):
 		copy = FolderNode(
