@@ -6,6 +6,7 @@ from datetime import datetime
 from functools import partial
 import hashlib
 import io
+import logging
 from pytz import utc
 import sys
 
@@ -101,14 +102,19 @@ class Dao(object):
 	
 	def __init__(self, notebook, notebook_storage, node_daos):
 		"""TODO"""
+		self.log = logging.getLogger('{m}.{c}'.format(m=self.__class__.__module__, c=self.__class__.__name__));
 		self._notebook = notebook
 		self._notebook_storage = notebook_storage
 		self._node_daos = node_daos
 		
 		self._last_remote_node_versions = []
 		self._last_local_node_versions = []
+		self._next_sync_run_id = 0
 	
 	def sync(self):
+		sync_run_id = self._next_sync_run_id
+		self._next_sync_run_id += 1
+		self.log.info('Starting synchronization run {id}'.format(id=sync_run_id))
 		now = datetime.now(tz=utc)
 		
 		# Load all remote StoredNodes.
@@ -159,6 +165,7 @@ class Dao(object):
 		
 		self._last_local_node_versions = local_sns_by_id.keys()
 		
+		self.log.info('Synchronization run {id} finished'.format(id=sync_run_id))
 	
 	def _add_new_in_local_to_remote(self, sns_by_id, node_ids):
 		for node_id in node_ids:
