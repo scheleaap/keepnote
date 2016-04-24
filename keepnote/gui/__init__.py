@@ -583,7 +583,7 @@ class GuiApplication(keepnote.Application):
 
         except Exception, e:
             # give up opening notebook
-            msg = _("Could not load notebook '%s'.") % location
+            msg = _("Could not load notebook '%s'") % location
             self.log.warn(msg, exc_info=task.exc_info())
             self.display_error(msg, e, task.exc_info()[2])
             return None
