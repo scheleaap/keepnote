@@ -211,8 +211,7 @@ class Dao(object):
 									node_id=stored_node.node_id))
 					
 				parent_notebook_node = nns_by_id[parent_id][1]
-				notebook_node.parent = parent_notebook_node
-				parent_notebook_node._add_child_node(notebook_node)
+				parent_notebook_node.add_new_node_as_child(notebook_node)
 			else:
 				if self._notebook.root is not None:
 					raise InvalidStructureError('Multiple root nodes found')

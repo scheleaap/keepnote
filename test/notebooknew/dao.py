@@ -80,6 +80,7 @@ class StructureTest(unittest.TestCase):
 		dao.sync()
 		
 		self.assertEqual(ROOT_SN.node_id, notebook.root.node_id)
+		self.assertEqual(notebook, notebook.root.notebook)
 		self.assertEqual(None, notebook.root.parent)
 # TODO: Enable
 # 		self.assertEqual(1, len(notebook.root.children))
@@ -100,8 +101,8 @@ class StructureTest(unittest.TestCase):
 		# Verify the structure.
 		child1 = notebook.root.children[0]
 		child2 = notebook.root.children[1]
-		self.assertEqual((CHILD1_SN.node_id, notebook.root, []), (child1.node_id, child1.parent, [node.node_id for node in child1.children]))
-		self.assertEqual((CHILD2_SN.node_id, notebook.root, []), (child2.node_id, child2.parent, [node.node_id for node in child2.children]))
+		self.assertEqual((CHILD1_SN.node_id, notebook, notebook.root, []), (child1.node_id, child1.notebook, child1.parent, [node.node_id for node in child1.children]))
+		self.assertEqual((CHILD2_SN.node_id, notebook, notebook.root, []), (child2.node_id, child1.notebook, child2.parent, [node.node_id for node in child2.children]))
 	
 	def test_new_in_remote_multiple_levels(self):
 		"""Test the NotebookNode structure with multiple levels of nodes."""
@@ -142,6 +143,15 @@ class StructureTest(unittest.TestCase):
 		self.assertEqual([CHILD121_SN.node_id], [node.node_id for node in child12.children])
 		self.assertEqual([CHILD21_SN.node_id], [node.node_id for node in child2.children])
 		self.assertEqual([], [node.node_id for node in child21.children])
+		
+		# Verify the notebooks. 
+		self.assertEqual(notebook, notebook.root.notebook)
+		self.assertEqual(notebook, child1.notebook)
+		self.assertEqual(notebook, child11.notebook)
+		self.assertEqual(notebook, child12.notebook)
+		self.assertEqual(notebook, child121.notebook)
+		self.assertEqual(notebook, child2.notebook)
+		self.assertEqual(notebook, child21.notebook)
 		
 		# Verify the parents. 
 		self.assertEqual(notebook.root, child1.parent)
@@ -996,7 +1006,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 		node = ContentNode(
 				notebook=notebook,
 				content_type=content_type,
-				parent=parent,
+				parent=None,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 # 				order=order,
@@ -1014,7 +1024,7 @@ class ContentNodeTest(ContentFolderNodeTest, unittest.TestCase):
 			if add_to_parent is None:
 				raise IllegalOperationError('Please pass add_to_parent')
 			elif add_to_parent == True:
-				parent._add_child_node(node)
+				parent.add_new_node_as_child(node)
 		return node
 	
 	def _get_class_dao(self):
@@ -1470,7 +1480,7 @@ class FolderNodeTest(ContentFolderNodeTest, unittest.TestCase):
 			if add_to_parent is None:
 				raise IllegalOperationError('Please pass add_to_parent')
 			elif add_to_parent == True:
-				parent._add_child_node(node)
+				parent._add_unbound_node_as_child(node)
 		return node
 	
 	def _get_class_dao(self):
@@ -1628,7 +1638,7 @@ class TrashNodeTest(ContentFolderTrashNodeTest, unittest.TestCase):
 			if add_to_parent is None:
 				raise IllegalOperationError('Please pass add_to_parent')
 			elif add_to_parent == True:
-				parent._add_child_node(node)
+				parent._add_unbound_node_as_child(node)
 		return node
 	
 	def _get_class_dao(self):

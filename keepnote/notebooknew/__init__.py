@@ -150,7 +150,14 @@ class Notebook(object):
 		if node.parent is not None:
 			raise ValueError('Trying to add a node as the root of the notebook that has a parent')
 		self._root = node
-		node._notebook = self
+		
+		# Set the notebook of all children.
+		nodes_to_process = []
+		nodes_to_process.append(node)
+		while len(nodes_to_process) > 0:
+			node = nodes_to_process.pop()
+			node._notebook = self
+			nodes_to_process += node.children
 	
 	def can_add_new_node_as_root(self):
 		"""Returns whether a new node can be added as the root of the notebook."""
@@ -289,10 +296,12 @@ class NotebookNode(object):
 		@param created_time: The creation time of the new node. Only if loaded_from_storage == True.
 		@param modified_time: The last modification time of the new node. Only if loaded_from_storage == True.
 		"""
-		self._notebook = notebook
+#		self._notebook = notebook
+		self._notebook = None
 		self._children = []
 		self.content_type = content_type
-		self.parent = parent
+#		self.parent = parent
+		self.parent = None
 		self._title = title
 		self.order = order
 		self._icon_normal = icon_normal
@@ -322,11 +331,6 @@ class NotebookNode(object):
 			self._modified_time = self._created_time
 			self.is_dirty = True
 
-	def _add_child_node(self, child_node):
-		"""DEPRECATED. Use _add_unbound_node_as_child() instead."""
-		self._children.append(child_node)
-		assert child_node.parent is self
-	
 	def add_new_node_as_child(self, child_node):
 		"""Adds a new node as a child of this node.
 		
@@ -355,8 +359,15 @@ class NotebookNode(object):
 		if child_node.parent is not None:
 			raise ValueError('Trying to add a node as a child that has a parent')
 		self._children.append(child_node)
-		child_node._notebook = self._notebook
 		child_node.parent = self
+		
+		# Set the notebook of all children.
+		children_to_process = []
+		children_to_process.append(child_node)
+		while len(children_to_process) > 0:
+			node = children_to_process.pop()
+			node._notebook = self._notebook
+			children_to_process += node.children
 	
 	def can_add_new_node_as_child(self):
 		"""Returns whether a new node can be added as a child of this node."""

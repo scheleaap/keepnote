@@ -131,16 +131,30 @@ class NotebookTest(unittest.TestCase):
 		assert_that(node.parent, is_(none()))
 		self._event_handler.assert_has_calls([call.on_node_added(node, parent=None)])
 	
-	def test_add_new_node_as_root_node_notebook_not_none(self):
+	def test_add_new_node_as_root_subtree(self):
 		notebook = self._create_notebook()
-		notebook.node_added_listeners.add(self._event_handler.on_node_added)
-		node = TestNotebookNode(notebook=notebook, parent=None)
+		child1 = TestNotebookNode(notebook=None, parent=None)
+		child11 = TestNotebookNode(notebook=None, parent=child1, add_to_parent=True)
+		child111 = TestNotebookNode(notebook=None, parent=child11, add_to_parent=True)
+		child12 = TestNotebookNode(notebook=None, parent=child1, add_to_parent=True)
+		
+		notebook.add_new_node_as_root(child1)
+		
+		assert_that(child11._notebook, is_(same_instance(notebook)))
+		assert_that(child111._notebook, is_(same_instance(notebook)))
+		assert_that(child12._notebook, is_(same_instance(notebook)))
+	
+	def test_add_new_node_as_root_node_notebook_not_none(self):
+		notebook1 = self._create_notebook()
+		notebook2 = self._create_notebook()
+		notebook1.node_added_listeners.add(self._event_handler.on_node_added)
+		node = TestNotebookNode(notebook=notebook2, add_to_notebook=True)
 		
 		with self.assertRaises(Exception):
-			notebook.add_new_node_as_root(node)
+			notebook1.add_new_node_as_root(node)
 		
-		assert_that(notebook.root, is_(none()))
-		assert_that(node._notebook, is_(same_instance(notebook)))
+		assert_that(notebook1.root, is_(none()))
+		assert_that(node._notebook, is_(same_instance(notebook2)))
 		assert_that(node.parent, is_(none()))
 	
 	def test_add_new_node_as_root_node_parent_not_none(self):
@@ -251,7 +265,11 @@ class ContentFolderTrashNodeTestBase(object):
 			created_time=DEFAULT,
 			modified_time=DEFAULT,
 			):
-		"""Creates a node of the class under test."""
+		"""Creates a node of the class under test.
+		
+		@param notebook: The notebook to add the node as root to.
+		@param parent: The parent to add the node as a new child to. Only used if notebook is None.
+		"""
 		raise NotImplementedError()
 	
 	def setUp(self):
@@ -372,15 +390,19 @@ class ContentFolderTrashNodeTestBase(object):
 		self.assertEqual(False, node.is_root)
 	
 	def test_is_node_a_child_1(self):
-		node = self._create_node(parent=None, loaded_from_storage=True)
-		child = TestNotebookNode(parent=node, add_to_parent=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=root, loaded_from_storage=True)
+		child = TestNotebookNode(parent=root, add_to_parent=True)
+		child.move(node)
 		
 		self.assertEqual(True, node.is_node_a_child(child))
 	
 	def test_is_node_a_child_2(self):
-		node = self._create_node(parent=None, loaded_from_storage=True)
-		child1 = TestNotebookNode(parent=node, add_to_parent=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=root, loaded_from_storage=True)
+		child1 = TestNotebookNode(parent=root, add_to_parent=True)
 		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
+		child1.move(node)
 		
 		self.assertEqual(True, node.is_node_a_child(child11))
 	
@@ -699,7 +721,7 @@ class ContentFolderTrashNodeTestBase(object):
 		assert_that(copy.client_preferences, is_not(same_instance(node.client_preferences)))
 	
 	def test_create_copy(self):
-		node = self._create_node(notebook=self._create_notebook(), loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, loaded_from_storage=False)
 		
 		copy = node.create_copy(with_subtree=False)
 		
@@ -728,6 +750,7 @@ class ContentFolderTrashNodeTestBase(object):
 class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	def test_is_trash(self):
 		node = self._create_node(parent=None, loaded_from_storage=True)
+		
 		self.assertEqual(False, node.is_trash)
 		
 	def test_is_in_trash_1(self):
@@ -740,20 +763,23 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(False, node.is_in_trash)
 	
 	def test_is_in_trash_2(self):
-		parent = Mock(spec=NotebookNode)
-		parent.is_trash = True
-		parent.is_in_trash = False
-		
-		node = self._create_node(parent=parent, loaded_from_storage=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		trash = TrashNode(
+				notebook=None,
+				parent=None,
+				loaded_from_storage=False,
+				title=None,
+				)
+		root.add_new_node_as_child(trash)
+		node = self._create_node(parent=root, loaded_from_storage=True)
+		node.move(trash)
 		
 		self.assertEqual(True, node.is_in_trash)
 	
 	def test_is_in_trash_3(self):
-		parent = Mock(spec=NotebookNode)
-		parent.is_trash = False
-		parent.is_in_trash = True
-		
+		parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
 		node = self._create_node(parent=parent, loaded_from_storage=True)
+		parent.set_is_in_trash(True)
 		
 		self.assertEqual(True, node.is_in_trash)
 	
@@ -763,8 +789,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self.assertEqual(False, node.is_in_trash)
 	
 	def test_title_set_if_deleted(self):
-		parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=parent, title=DEFAULT_TITLE, loaded_from_storage=False)
+		parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=parent, title=DEFAULT_TITLE, loaded_from_storage=False)
 		node.delete()
 		
 		with self.assertRaises(IllegalOperationError):
@@ -792,21 +818,34 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(same_instance(node)))
 		self._event_handler.assert_has_calls([call.on_node_added(child, parent=node)])
 	
+	def test_add_new_node_as_child_subtree(self):
+		node = self._create_node(notebook=self._notebook, loaded_from_storage=False)
+		child1 = TestNotebookNode(notebook=None, parent=None)
+		child11 = TestNotebookNode(notebook=None, parent=child1, add_to_parent=True)
+		child111 = TestNotebookNode(notebook=None, parent=child11, add_to_parent=True)
+		child12 = TestNotebookNode(notebook=None, parent=child1, add_to_parent=True)
+		
+		node.add_new_node_as_child(child1)
+		
+		assert_that(child11._notebook, is_(same_instance(node._notebook)))
+		assert_that(child111._notebook, is_(same_instance(node._notebook)))
+		assert_that(child12._notebook, is_(same_instance(node._notebook)))
+	
 	def test_add_new_node_as_child_child_notebook_not_none(self):
-		notebook = self._create_notebook()
-		node = self._create_node(notebook=notebook, loaded_from_storage=False)
-		child = TestNotebookNode(notebook=notebook, parent=None)
+		notebook1 = self._create_notebook()
+		notebook2 = self._create_notebook()
+		node = self._create_node(notebook=notebook1, loaded_from_storage=False)
+		child = TestNotebookNode(notebook=notebook2, add_to_notebook=True, parent=None)
 		
 		with self.assertRaises(Exception):
 			node.add_new_node_as_child(child)
 		
 		assert_that(node.children, is_not(contains(child)))
-		assert_that(child._notebook, is_(same_instance(notebook)))
+		assert_that(child._notebook, is_(same_instance(notebook2)))
 		assert_that(child.parent, is_(none()))
 	
 	def test_add_new_node_as_child_child_parent_not_none(self):
-		notebook = self._create_notebook()
-		node = self._create_node(notebook=notebook, loaded_from_storage=False)
+		node = self._create_node(notebook=self._notebook, loaded_from_storage=False)
 		other_parent = TestNotebookNode()
 		child = TestNotebookNode(parent=other_parent, add_to_parent=True)
 		
@@ -847,10 +886,16 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	
 	def test_add_new_node_as_child_node_in_trash_1(self):
 		notebook = self._create_notebook()
-		parent = Mock(spec=NotebookNode)
-		parent.is_trash = True
-		parent.is_in_trash = False
-		node = self._create_node(notebook=notebook, parent=parent, loaded_from_storage=False)
+		root = TestNotebookNode(notebook=notebook, add_to_notebook=True)
+		trash = TrashNode(
+				notebook=None,
+				parent=None,
+				loaded_from_storage=False,
+				title=None,
+				)
+		root.add_new_node_as_child(trash)
+		node = self._create_node(parent=root, loaded_from_storage=False)
+		node.move(trash)
 		child = TestNotebookNode(notebook=None, parent=None)
 		
 		assert_that(node.can_add_new_node_as_child(), is_(False))
@@ -864,10 +909,9 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	
 	def test_add_new_node_as_child_node_in_trash_2(self):
 		notebook = self._create_notebook()
-		parent = Mock(spec=NotebookNode)
-		parent.is_trash = False
-		parent.is_in_trash = True
-		node = self._create_node(notebook=notebook, parent=parent, loaded_from_storage=False)
+		parent = TestNotebookNode(notebook=notebook, add_to_notebook=True)
+		node = self._create_node(parent=parent, loaded_from_storage=False)
+		parent.set_is_in_trash(True)
 		child = TestNotebookNode(notebook=None, parent=None)
 		
 		assert_that(node.can_add_new_node_as_child(), is_(False))
@@ -880,8 +924,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		assert_that(child.parent, is_(none()))
 	
 	def test_delete_without_children(self):
-		parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=parent, loaded_from_storage=True)
+		parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=parent, loaded_from_storage=True)
 		
 		self.assertEqual(False, node.is_dirty)
 		self.assertEqual(False, node.is_deleted)
@@ -896,16 +940,20 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		self._event_handler.assert_has_calls([call.on_node_removed(node)])
 	
 	def test_delete_with_children(self):
-		parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=parent, loaded_from_storage=True)
+		parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=parent, loaded_from_storage=True)
 		child1 = Mock(spec=NotebookNode)
-		child1.notebook = notebook=self._notebook
-		child1.parent = node
+		child1._notebook = None
+		child1.parent = None
+		child1.children = []
+		child1.is_deleted = False
 		child2 = Mock(spec=NotebookNode)
-		child2.notebook = notebook=self._notebook
-		child2.parent = node
-		node._add_child_node(child1)
-		node._add_child_node(child2)
+		child2._notebook = None
+		child2.parent = None
+		child2.children = []
+		child2.is_deleted = False
+		node.add_new_node_as_child(child1)
+		node.add_new_node_as_child(child2)
 		
 		node.delete()
 		
@@ -918,9 +966,12 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		parent = TestNotebookNode()
 		node = self._create_node(parent=parent, loaded_from_storage=True)
 		child = Mock(spec=NotebookNode)
-		child.parent = node
+		child._notebook = None
+		child.parent = None
+		child.is_deleted = False
+		child.children = []
 		child.delete.side_effect = Exception()
-		node._add_child_node(child)
+		node.add_new_node_as_child(child)
 		
 		with self.assertRaises(Exception):
 			node.delete()
@@ -933,9 +984,10 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	def test_move(self):
 		"""Tests moving a node."""
 		# Create the node and parents.
-		old_parent = TestNotebookNode(notebook=self._notebook)
-		new_parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		old_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		new_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
 		old_modified_time = node.modified_time
 		sleep(1 * MS)
 		
@@ -960,11 +1012,12 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		"""Tests moving a node behind a sibling."""
 		
 		# Create the node and parents.
-		old_parent = TestNotebookNode(notebook=self._notebook)
-		new_parent = TestNotebookNode(notebook=self._notebook)
-		child1 = TestNotebookNode(notebook=self._notebook, parent=new_parent, add_to_parent=True)
-		child2 = TestNotebookNode(notebook=self._notebook, parent=new_parent, add_to_parent=True)
-		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		old_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		new_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		child1 = TestNotebookNode(parent=new_parent, add_to_parent=True)
+		child2 = TestNotebookNode(parent=new_parent, add_to_parent=True)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
 		
 		# Move the node.
 		node.move(new_parent, behind=child1)
@@ -974,9 +1027,10 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	
 	def test_move_behind_nonexistent_sibling(self):
 		# Create the node and parents.
-		old_parent = TestNotebookNode(notebook=self._notebook)
-		new_parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		old_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		new_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
 		
 		with self.assertRaises(IllegalOperationError):
 			# Move the node.
@@ -993,9 +1047,10 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 	def test_move_if_deleted(self):
 		"""Tests moving a node if it is deleted."""
 		
-		old_parent = TestNotebookNode(notebook=self._notebook)
-		new_parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		old_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		new_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
 		node.delete()
 		
 		# Verify the node.
@@ -1015,8 +1070,8 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		"""Tests moving a node if it is the root."""
 		
 		# Create the node and parents.
-		new_parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=None, loaded_from_storage=True)
+		new_parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=None, loaded_from_storage=True)
 		
 		# Verify the node.
 		self.assertEqual(False, node.can_move(new_parent))
@@ -1036,10 +1091,10 @@ class ContentFolderNodeTestBase(ContentFolderTrashNodeTestBase):
 		"""Tests moving a node to one of its children."""
 		
 		# Create the node and parents.
-		old_parent = TestNotebookNode(notebook=self._notebook)
-		node = self._create_node(notebook=self._notebook, parent=old_parent, loaded_from_storage=True)
-		child1 = TestNotebookNode(notebook=self._notebook, parent=node, add_to_parent=True)
-		child11 = TestNotebookNode(notebook=self._notebook, parent=child1, add_to_parent=True)
+		old_parent = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		node = self._create_node(parent=old_parent, loaded_from_storage=True)
+		child1 = TestNotebookNode(parent=node, add_to_parent=True)
+		child11 = TestNotebookNode(parent=child1, add_to_parent=True)
 		new_parent = child11
 		
 		# Verify the node.
@@ -1129,9 +1184,9 @@ class ContentNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 				modified_time = None
 		
 		node = ContentNode(
-				notebook=notebook,
+				notebook=None,
 				content_type=DEFAULT_CONTENT_TYPE,
-				parent=parent,
+				parent=None,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 				order=order,
@@ -1146,8 +1201,10 @@ class ContentNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if parent is not None:
-			parent._add_child_node(node)
+		if notebook is not None:
+			notebook.add_new_node_as_root(node)
+		elif parent is not None:
+			parent.add_new_node_as_child(node)
 		return node
 	
 	def test_create_c(self):
@@ -1292,8 +1349,8 @@ class FolderNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 				modified_time = None
 		
 		node = FolderNode(
-				notebook=notebook,
-				parent=parent,
+				notebook=None,
+				parent=None,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 				order=order,
@@ -1306,8 +1363,10 @@ class FolderNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if parent is not None:
-			parent._add_child_node(node)
+		if notebook is not None:
+			notebook.add_new_node_as_root(node)
+		elif parent is not None:
+			parent.add_new_node_as_child(node)
 		return node
 
 
@@ -1345,8 +1404,8 @@ class TrashNodeTest(ContentFolderTrashNodeTestBase, unittest.TestCase):
 				modified_time = None
 		
 		node = TrashNode(
-				notebook=notebook,
-				parent=parent,
+				notebook=None,
+				parent=None,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 				order=order,
@@ -1359,8 +1418,10 @@ class TrashNodeTest(ContentFolderTrashNodeTestBase, unittest.TestCase):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if parent is not None:
-			parent._add_child_node(node)
+		if notebook is not None:
+			notebook.add_new_node_as_root(node)
+		elif parent is not None:
+			parent.add_new_node_as_child(node)
 		return node
 	
 	def test_is_trash(self):
@@ -1382,14 +1443,13 @@ class TrashNodeTest(ContentFolderTrashNodeTestBase, unittest.TestCase):
 		node = TrashNode(
 				notebook=None,
 				node_id=DEFAULT_ID,
-				parent=parent,
+				parent=None,
 				loaded_from_storage=True,
 				title=DEFAULT_TITLE,
 				)
-		parent._add_child_node(node)
 		child = Mock(spec=NotebookNode)
 		child.parent = node
-		node._add_child_node(child)
+		node._children.append(child)
 		
 		self.assertEqual(False, node.can_delete())
 				
@@ -1405,13 +1465,10 @@ class TrashNodeTest(ContentFolderTrashNodeTestBase, unittest.TestCase):
 		"""Tests moving a node."""
 		
 		# Create the node and parents.
-		old_parent = Mock(spec=NotebookNode)
+		root = TestNotebookNode(notebook=self._notebook, add_to_notebook=True)
+		old_parent = TestNotebookNode(parent=root, add_to_parent=True)
+		new_parent = TestNotebookNode(parent=root, add_to_parent=True)
 		node = self._create_node(parent=old_parent, loaded_from_storage=True)
-		old_parent.children = [node]
-		new_parent = Mock(spec=NotebookNode)
-		new_parent._notebook = None
-		new_parent.parent = None
-		new_parent.children = []
 		
 		# Verify the node.
 		self.assertEqual(False, node.can_move(new_parent))

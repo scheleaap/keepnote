@@ -10,7 +10,7 @@ from .testutils import *
 
 CONTENT_TYPE_TEST = u'application/x-notebook-test-node'
 
-class TestNotebookNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
+class TestNotebookNodeTest(ContentFolderNodeTestBase, unittest.TestCase):
 	def _create_node(
 			self,
 			notebook=None,
@@ -44,8 +44,9 @@ class TestNotebookNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				modified_time = None
 		
 		node = TestNotebookNode(
-				notebook=notebook,
-				parent=parent,
+				notebook=None,
+				add_to_notebook=False,
+				parent=None,
 				add_to_parent=False,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
@@ -59,6 +60,8 @@ class TestNotebookNodeTest(unittest.TestCase, ContentFolderNodeTestBase):
 				created_time=created_time,
 				modified_time=modified_time,
 				)
-		if parent is not None:
-			parent._add_child_node(node)
+		if notebook is not None:
+			notebook.add_new_node_as_root(node)
+		elif parent is not None:
+			parent.add_new_node_as_child(node)
 		return node

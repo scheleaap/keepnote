@@ -76,6 +76,7 @@ class TestNotebookNode(FolderNode):
 
 	def __init__(self,
 			notebook=None,
+			add_to_notebook=None,
 			parent=None,
 			add_to_parent=None,
 			loaded_from_storage=False,
@@ -92,8 +93,8 @@ class TestNotebookNode(FolderNode):
 			):
 		
 		super(TestNotebookNode, self).__init__(
-				notebook=notebook,
-				parent=parent,
+				notebook=None,
+				parent=None,
 				loaded_from_storage=loaded_from_storage,
 				title=title,
 				order=order,
@@ -112,11 +113,16 @@ class TestNotebookNode(FolderNode):
 		self._create_copy_result_override = None
 		self._is_in_trash_override = None
 		
-		if self.parent is not None:
+		if notebook is not None:
+			if add_to_notebook is None:
+				raise IllegalOperationError('Please pass add_to_notebook')
+			elif add_to_notebook == True:
+				notebook.add_new_node_as_root(self) 
+		elif parent is not None:
 			if add_to_parent is None:
 				raise IllegalOperationError('Please pass add_to_parent')
 			elif add_to_parent == True:
-				self.parent._add_child_node(self)
+				parent.add_new_node_as_child(self)
 	
 	def create_copy(self, with_subtree):
 		if self._create_copy_result_override is not None:
